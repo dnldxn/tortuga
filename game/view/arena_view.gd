@@ -4,6 +4,7 @@ extends Node2D
 ## selection) and never mutates it.
 
 const Definitions := preload("res://sim/definitions.gd")
+const ReefGlass := preload("res://view/reef_glass.gd")
 
 const TEXTURES := {
 	"sloop": preload("res://assets/ships/sloop.svg"),
@@ -14,9 +15,7 @@ const TEXTURES := {
 const MASTS := {"sloop": [2.0], "brig": [-10.0, 12.0], "frigate": [-20.0, 2.0, 22.0]}
 const REEFED_SAIL_SCALE := Vector2(0.6, 0.5)
 
-const SEA := Color(0.09, 0.36, 0.55)
-const WAVE := Color(0.55, 0.78, 0.9, 0.35)
-const SHALLOWS := Color(0.36, 0.72, 0.72)
+const SHALLOWS := Color(0.36, 0.72, 0.72, 0.25)
 const HATCH := Color(0.9, 0.95, 0.85, 0.45)
 const LAND := Color(0.42, 0.55, 0.3)
 const SAND := Color(0.9, 0.82, 0.58)
@@ -38,9 +37,11 @@ var _ships := {}  # ship id -> Sprite2D
 var _cues := []  # deep-copied events with ticks; never aliases sim.events
 var marker_layer: CanvasLayer
 var marker_canvas: Control
+var water: Node2D
 
 
 func advance_effects() -> void:
+	water.advance(main.DT, main.sim.wind_heading)
 	for cue in _cues:
 		cue["ticks"] -= 1
 	_cues = _cues.filter(func(cue): return cue["ticks"] > 0)
@@ -58,6 +59,7 @@ func consume_events(events: Array) -> void:
 
 func reset_effects() -> void:
 	_cues.clear()
+	water.reset(main.sim.wind_heading)
 	queue_redraw()
 	if marker_canvas != null:
 		marker_canvas.queue_redraw()
@@ -73,6 +75,9 @@ func target_marker(center: Vector2, target: Vector2, screen: Rect2) -> Dictionar
 
 func _ready() -> void:
 	main = get_parent()
+	water = ReefGlass.new()
+	water.name = "ReefGlass"
+	add_child(water)
 	camera.zoom = Vector2.ONE
 	camera.position_smoothing_enabled = true
 	camera.position_smoothing_speed = 5.0
@@ -141,6 +146,7 @@ func _active_enemy(sim) -> Variant:
 
 ## Reconciles ship nodes with sim.ships by stable id and points the camera at the player.
 func sync(sim) -> void:
+	water.set_wind(sim.wind_heading)
 	for id in _ships.keys():
 		var ship: Dictionary = sim.ships.get(id, {})
 		if ship.is_empty() or ship["vessel_id"] != _ships[id].get_meta("vessel_id"):
@@ -205,15 +211,7 @@ func _make_ship(vessel_id: String) -> Sprite2D:
 func _draw() -> void:
 	var size := Definitions.ARENA_SIZE
 	var m := Definitions.ARENA_MARGIN
-	draw_rect(Rect2(Vector2.ZERO, size), SEA)
-	# Open-sea wave marks: little chevrons on a staggered grid.
-	var waves := PackedVector2Array()
-	for row in int(size.y / 140.0):
-		for x in range(60 + (row % 2) * 90, int(size.x), 180):
-			var p := Vector2(x, 100 + row * 140)
-			waves.append_array([p, p + Vector2(10, -6), p + Vector2(10, -6), p + Vector2(20, 0)])
-	draw_multiline(waves, WAVE, 2.0)
-	# Shallows band on all four sides, hatched so it reads without colour.
+	# Translucent shallows tint preserves the animated water beneath the safety hatch.
 	var bands := [Rect2(0, 0, size.x, m), Rect2(0, size.y - m, size.x, m),
 		Rect2(0, 0, m, size.y), Rect2(size.x - m, 0, m, size.y)]
 	var hatch := PackedVector2Array()

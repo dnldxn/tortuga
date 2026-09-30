@@ -4,6 +4,17 @@ extends RefCounted
 const ARENA_SIZE := Vector2(6000, 4200)
 const ARENA_MARGIN := 160.0
 
+## Reef Glass presentation tuning; never used by simulation movement or contacts.
+const WATER := {
+	"animation_speed": 0.75,
+	"drift_speed": 0.1,
+	"world_scale": 144.0,  # World pixels per shader unit; independent of camera/viewport.
+	"shallow_fade": 600.0,
+	"swell_weights": Vector3(0.34, 0.16, 0.060),
+	"texture_weight": 0.12,
+	"whitecap_lifetime": Vector2(4.0, 8.0),  # Animation seconds, before speed scaling.
+}
+
 const VESSELS := {
 	"sloop": {
 		"display_name": "Sloop",
