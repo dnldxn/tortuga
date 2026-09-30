@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48" viewBox="0 0 96 48">
+  <!-- Frigate: broad three-mast hull with gun-deck ports, bow toward +X. Original work for Tortuga, 2026-09-30. -->
+  <path d="M3 9 Q1 24 3 39 L60 40 C80 40 91 31 95 24 C91 17 80 8 60 8 Z" fill="#4e2e17" stroke="#1f1208" stroke-width="1.5"/>
+  <path d="M6 11 H60 M6 37 H60" stroke="#e8d9a8" stroke-width="3" stroke-dasharray="3 4"/>
+  <path d="M8 15 L60 14 C74 14 82 19 86 24 C82 29 74 34 60 34 L8 33 Z" fill="#a9824c"/>
+  <rect x="6" y="15" width="16" height="18" fill="#7a5129"/>
+  <circle cx="28" cy="24" r="3.5" fill="#1f1208"/>
+  <circle cx="50" cy="24" r="3.5" fill="#1f1208"/>
+  <circle cx="70" cy="24" r="3" fill="#1f1208"/>
+</svg>

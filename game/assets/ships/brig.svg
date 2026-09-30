@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40" viewBox="0 0 80 40">
+  <!-- Brig: square-sterned two-mast hull, bow toward +X. Original work for Tortuga, 2026-09-30. -->
+  <path d="M2 9 L50 8 C65 8 75 14 79 20 C75 26 65 32 50 32 L2 31 Z" fill="#6b3f1f" stroke="#2a170a" stroke-width="1.5"/>
+  <path d="M6 13 L50 12 C61 12 68 16 71 20 C68 24 61 28 50 28 L6 27 Z" fill="#b98f55"/>
+  <rect x="4" y="12" width="10" height="16" fill="#8a5a2e"/>
+  <circle cx="30" cy="20" r="3" fill="#2a170a"/>
+  <circle cx="52" cy="20" r="3" fill="#2a170a"/>
+</svg>
