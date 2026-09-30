@@ -17,6 +17,7 @@ This is the project's master roadmap: it establishes direction, sequencing, depe
 - Preserve the spirit of *Pirates!*: freedom to choose a course, short adventures within a longer career, readable tactical choices, and consequences that connect otherwise simple activities.
 - Deliver a classic-modernized experience: overhead sailing, captain-focused decisions, stylized swashbuckling, and modern usability.
 - Support Windows, macOS, and Linux, with feasibility established early and actual platform verification throughout development.
+- Deliver highly performant play, extremely fast loading, and tiny game files: responsive controls, smooth frame pacing, short waits to playable action, and a small total download and installed footprint. Treat these as first-class constraints on engine, asset, and feature choices.
 - Make sailing and naval combat enjoyable before expanding the world or production scope.
 - Support offline play as a complete experience, alongside a small-group shared campaign in which independent captains can cooperate and compete.
 - Introduce exploration, ship variety, trade, crew management, faction relationships, quests, and captain progression in independently verifiable increments.
@@ -46,6 +47,7 @@ This is the project's master roadmap: it establishes direction, sequencing, depe
 | Research sources | Include Wikipedia, cross-check important mechanics with the official manual, and distinguish design testimony from reviews and interpretation. |
 | First playable milestone | An offline naval MVP centered on sailing and ship combat against AI. |
 | Multiplayer destination | Small-group shared Caribbean campaigns, each player an independent captain. |
+| Phase 1 hosting direction | Dedicated server for 2–4 independent captains; game time pauses when empty. Offline play remains self-contained. |
 | Multiplayer timing | Immediately after the offline naval MVP, starting with bounded naval sessions. |
 | Presentation | Classic-modernized overhead adventure; light swashbuckling tone, readable action, and accessible interaction. |
 | Development capacity | Solo/AI-assisted; production scope must account for art, animation, audio, content, and human testing. |
@@ -58,7 +60,7 @@ The master plan is detailed about outcomes and boundaries while remaining high-l
 
 #### Scope and evidence
 
-The initial desk-research pass reviewed Wikipedia's articles on the 1987 original and 2004 remake, the official PC manual, Sid Meier's account of the game's design intent, and contemporary PC and Xbox reviews. It establishes a foundation for this roadmap; it does not constitute hands-on playtesting or verification of every edition-specific mechanic. Phase 1 must turn this foundation into a concise reference dossier and validate feel, pacing, and disputed behavior through direct observation.
+The initial desk-research pass reviewed Wikipedia's articles on the 1987 original and 2004 remake, the official PC manual, Sid Meier's account of the game's design intent, and contemporary PC and Xbox reviews. It establishes a foundation for this roadmap; it does not constitute hands-on playtesting or verification of every edition-specific mechanic. Phase 1 must turn this foundation into a concise reference dossier and investigate pacing and observable behavior through recorded 2004 PC gameplay, cross-checked against the manual. Reference-game input feel and enjoyment remain sourced testimony or hypotheses; Tortuga's feel and enjoyment require Phase 2 human playtests.
 
 The manual describes intended mechanics; reviews describe the reviewers' experiences and judgments. Wikipedia supplies broad context and edition comparisons. None should be treated as an exact specification for Tortuga or as the sole source for historical accuracy.
 
@@ -106,11 +108,15 @@ Before starting each phase, create its detailed plan covering the player outcome
 
 **Purpose:** Establish what Tortuga must preserve and what it should change before implementation begins.
 
+**Detailed research brief:** [Phase 1: Research and direction — specification #1](https://github.com/dnldxn/tortuga/issues/1). The brief is approved; research findings and technical feasibility measurements are pending.
+
 **Scope:** Expand the reference research with observed play, map the main systems and their relationships, and make a preserve/modernize/defer assessment. Define the initial naval play area and art direction at a scope appropriate for one owner. Evaluate development tools and cross-platform feasibility. Resolve enough of the multiplayer session model—independent captains, intended group size, world time, encounters, and ownership—to avoid building an incompatible offline foundation. Establish an asset sourcing and production approach for Tortuga's own presentation.
+
+**Performance and footprint brief:** Establish measurable budgets for frame time and pacing, memory use, cold-start time to playable action, encounter loading/replay time, compressed download size, and installed size. Define reference hardware, resolution, build configuration, and measurement conditions. Evaluate candidate tools and representative assets against these budgets in feasibility work; record measured evidence separately from estimates. Account for required runtime dependencies in the footprint.
 
 **Dependencies:** README goals, interview decisions, and the research foundation above.
 
-**Completion gate:** An approved reference dossier, design pillars, bounded naval-MVP brief, and feasibility findings sufficient to plan Phase 2. Record and close foundational unknowns; retain later feature decisions for their owning phases.
+**Completion gate:** An approved reference dossier, design pillars, bounded naval-MVP brief, and feasibility findings sufficient to plan Phase 2, including agreed performance, loading-time, and file-size budgets and evidence that the proposed approach can plausibly meet them. Record and close foundational unknowns; retain later feature decisions for their owning phases.
 
 #### Phase 2 — Offline naval MVP
 
@@ -128,7 +134,7 @@ Before starting each phase, create its detailed plan covering the player outcome
 
 **Purpose:** Prove the same naval experience with multiple independent human captains.
 
-**Scope:** Private sessions, joining and leaving, cooperative encounters against AI, shared encounter outcomes, and clear behavior when a participant or session owner disconnects. Finalize the initial player-count and session expectations in this phase's detailed plan.
+**Scope:** Private dedicated-server sessions, joining and leaving, cooperative encounters against AI, shared encounter outcomes, and clear behavior when a participant disconnects or the server stops. Finalize the initial player-count and session expectations within Phase 1's 2–4-captain envelope in this phase's detailed plan.
 
 **Dependencies:** The enjoyable offline naval loop and Phase 1 multiplayer constraints.
 
@@ -150,7 +156,7 @@ Before starting each phase, create its detailed plan covering the player outcome
 
 **Purpose:** Turn naval scenarios into a persistent place to adventure.
 
-**Scope:** A small Caribbean region with recognizable geography, navigable routes, destinations, and AI traffic. Establish independent player travel, entry into and exit from encounters, shared-world time, and what uninvolved players experience during battles. Introduce offline campaign saving and host/session campaign saving and resuming, with clear player identities and ownership of ships.
+**Scope:** A small Caribbean region with recognizable geography, navigable routes, destinations, and AI traffic. Establish independent player travel, entry into and exit from encounters, shared-world time, and what uninvolved players experience during battles. Introduce offline campaign saving and dedicated-server campaign saving and resuming, with clear player identities and ownership of ships. Shared campaign game time pauses when no players are connected.
 
 **Dependencies:** Offline, cooperative, and competitive naval foundations.
 
@@ -302,6 +308,7 @@ Other ideas remain in an evaluated backlog. They do not enter the roadmap simply
 - **Cooperation and competition:** Naval matches establish the combat proof; campaign phases progressively establish rewards, property loss, faction rivalry, quest credit, and progression fairness.
 - **Player pacing:** Towns, battles, duels, and shore activities must account for independently moving captains. Resolve each transition before expanding the activity.
 - **Cross-platform delivery:** Verify executable builds at the naval milestone and continue representative platform checks. Establish supported versions and hardware targets during detailed planning; do not defer portability discovery to release polish.
+- **Performance, loading, and tiny files:** Set budgets in Phase 1 and verify them from the Phase 2 playable build onward on supported platforms. Track runtime performance, cold-start and encounter waits, and total compressed/download and installed sizes, including required dependencies. Recheck as content grows; a missed budget requires optimization, scope reduction, or an explicit approved revision before the milestone closes. Do not postpone these goals to release polish.
 - **Production quality:** Start with clear placeholder presentation and a small content set. Build coherent art, animation, audio, interface, and content workflows as needed; final polish refines these rather than creating them from nothing.
 - **Accessibility and usability:** Readability, remappable input expectations, understandable feedback, and appropriate difficulty are considered from the first playable milestone and revisited as activities expand.
 - **Human verification:** AI-generated work still requires observed play, integration checks, and human judgment about whether the game is enjoyable.
@@ -318,6 +325,7 @@ Other ideas remain in an evaluated backlog. They do not enter the roadmap simply
 | The project accumulates too many minigames or too much content | Selective revival, one-feature phases, and a bounded region precede expansion. |
 | Progression, trade, or PvP create dominant strategies | Playtest player choices and consequences at the owning phase, including mixed progression and simultaneous actions. |
 | Asset production exceeds solo capacity | Research production scope early, use small representative sets, and expand only after the content workflow is practical. |
+| Engine overhead or growing assets undermine fast loading and tiny files | Establish budgets and representative feasibility measurements in Phase 1; check packaged builds from Phase 2 onward before increasing content scope. |
 | Platform or persistence problems emerge late | Verify portability early and campaign saving when persistent exploration is introduced. |
 
 ### 7. Research sources
@@ -345,10 +353,11 @@ These are deliberately deferred decisions with an owning phase. Resolve each bef
 | Which initial Caribbean region and bounded historical period within the README's Golden Age of Piracy setting best fit the compact adventure? | Phase 1; refine geography for Phase 5. |
 | Which engine, tools, and asset approach meet the solo workflow and three-platform target? | Phase 1, supported by feasibility work. |
 | What are the minimum hardware, OS, and initial input targets? | Phase 1 direction; explicit Phase 2 verification criteria. |
-| What small-group player count, hosting/session model, and participant persistence will be supported? | Phase 1 feasibility envelope; finalize for Phase 3. |
+| What frame-time, memory, loading-time, download-size, and installed-size budgets define highly performant, extremely fast-loading, and tiny on the target hardware? | Phase 1; verify from Phase 2 onward and revisit explicitly when scope changes. |
+| What server operating requirements and participant persistence support the agreed dedicated-server, 2–4-captain envelope? | Phase 1 feasibility; finalize session rules for Phase 3. |
 | How do shared time, independent movement, encounter boundaries, and campaign ownership work? | Phase 1 constraints; finalize and validate in Phase 5. |
-| What happens when a host leaves, and what is required of reconnect/resume? | Phase 3 session rules; Phase 5 persistent-world rules. |
-| Can an offline campaign later become multiplayer, or move between hosts? | Phase 5; offline and multiplayer support alone does not promise save conversion. |
+| What happens when a participant disconnects or the dedicated server stops, and what is required of reconnect/resume? | Phase 3 session rules; Phase 5 persistent-world rules. |
+| Can an offline campaign later become multiplayer, or move between servers? | Phase 5; offline and multiplayer support alone does not promise save conversion. |
 | What are the port safety, campaign PvP consent, loot-sharing, and loss/recovery rules? | Phase 6 for port safety; Phase 7 for prizes and player property. |
 | How much economic simulation is useful before it becomes work rather than adventure? | Phase 8. |
 | Which faction changes are simulated, and how does divided allegiance affect a group? | Phase 10. |
@@ -357,4 +366,4 @@ These are deliberately deferred decisions with an owning phase. Resolve each bef
 | How should duels and treasure discoveries handle uninvolved or competing players? | Phases 14 and 15 respectively. |
 | What release audience, distribution approach, budget, and presentation bar are realistic? | Establish production assumptions in Phase 1; revisit before Phase 16 expansion and Phase 17 release planning. |
 
-**Next planning session:** develop the detailed Phase 1 research brief, including the reference-play checklist, feasibility questions, and concrete deliverables. This master plan authorizes phase planning, not immediate implementation of every listed feature.
+**Next step:** use the approved [Phase 1 research brief](https://github.com/dnldxn/tortuga/issues/1) to plan and execute the bounded research and feasibility work. Phase 1 closes only after its deliverables and budgets are accepted; this master plan does not authorize immediate implementation of every listed feature.
