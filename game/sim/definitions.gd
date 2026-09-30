@@ -101,6 +101,17 @@ const AI := {
 	"speed_ratio": 1.15,
 	"chain_healthy_sail_fraction": 0.45,
 	"fire_bearing": 10.0 * PI / 180.0,  # inside the player's 12-degree assist cone
+	# Avoidance/recovery tuning (plan 03 task 4; shared extension point for plan 05).
+	"look_ahead_s": 0.75,
+	"ship_clearance": 60.0,
+	"boundary_inset": 50.0,
+	"contact_margin": 6.0,
+	"progress_window_s": 1.0,
+	"stuck_displacement": 8.0,
+	"recovery_minimum_s": 1.5,
+	"recovery_exit_separation": 100.0,
+	"recovery_inset": 150.0,
+	"avoid_bias": 0.5,
 }
 
 

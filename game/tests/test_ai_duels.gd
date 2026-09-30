@@ -45,6 +45,10 @@ func run(t) -> bool:
 	_test_ammo_hysteresis(t)
 	_test_cycle_realization(t)
 	_test_fire_gating(t)
+	_test_head_on_avoidance(t)
+	_test_overlap_recovery(t)
+	_test_boundary_recovery(t)
+	_test_recovery_details(t)
 	return true
 
 
@@ -440,3 +444,118 @@ func _test_fire_gating(t) -> void:
 	dead["ships"][2]["sides"]["port"]["ready"] = 1
 	dead["ships"][1]["active"] = false
 	t.check(_enemy_command(dead).is_empty(), "inactive target produces no command at all")
+
+
+## AI-versus-static-player head-on: within 12s the pair separates beyond exit margin.
+func _test_head_on_avoidance(t) -> void:
+	for preset_id in PRESETS:
+		var enemy_vessel: String = PRESETS[preset_id]["enemy"]
+		var sim = NavalSimulation.new()
+		sim.reset(preset_id, "sloop")
+		# Aim the enemy straight at the player from just outside contact range.
+		var sum_r: float = Definitions.VESSELS[enemy_vessel]["radius"] + Definitions.VESSELS["sloop"]["radius"]
+		var player_pos: Vector2 = sim.ships[1]["position"]
+		sim.ships[2]["position"] = player_pos + Vector2(sum_r + 10.0, 0.0)
+		sim.ships[2]["heading"] = PI  # head-on west while the player holds still
+		sim.ships[1]["speed"] = 0.0
+		sim.ships[1]["sails"] = 0.0  # a speedless player is a pure obstacle
+		var ai = AIController.new()
+		var cleared := false
+		var bounded := true
+		for i in 720:  # 12s
+			var commands: Dictionary = ai.commands_for_tick(sim.ai_observation(), DT)
+			commands[1] = {}
+			sim.step(DT, commands)
+			bounded = bounded and Definitions.safe_bounds(Definitions.VESSELS[enemy_vessel]["radius"]).has_point(sim.ships[2]["position"])
+			if sim.ships[2]["position"].distance_to(sim.ships[1]["position"]) > sum_r + Definitions.AI["recovery_exit_separation"]:
+				cleared = true
+				break
+		t.check(cleared and bounded, "%s: head-on contact clears within 12s, stays in bounds" % preset_id)
+		t.check(sim.ships[2]["active"] and sim.ships[1]["active"], "%s: avoidance deals no damage" % preset_id)
+
+
+## Overlapping spawn still separates through ordinary helm commands (no teleport).
+func _test_overlap_recovery(t) -> void:
+	var sim = NavalSimulation.new()
+	sim.reset("duel_sloop", "sloop")
+	sim.ships[2]["position"] = sim.ships[1]["position"] + Vector2(15.0, 0.0)
+	sim.ships[1]["sails"] = 0.0
+	var sum_r: float = Definitions.VESSELS["sloop"]["radius"] * 2.0
+	var ai = AIController.new()
+	var cleared := false
+	for i in 720:
+		var commands: Dictionary = ai.commands_for_tick(sim.ai_observation(), DT)
+		commands[1] = {}
+		sim.step(DT, commands)
+		if sim.ships[2]["position"].distance_to(sim.ships[1]["position"]) > sum_r + Definitions.AI["recovery_exit_separation"]:
+			cleared = true
+			break
+	t.check(cleared, "overlapped spawn separates beyond radius sum + 100 within 12s")
+
+
+## Every wall and corner: a ship spawned facing outward recovers inward and stays
+## finite, in bounds, with its tracks untouched.
+func _test_boundary_recovery(t) -> void:
+	var bounds := Definitions.safe_bounds(Definitions.VESSELS["sloop"]["radius"])
+	var spots := [
+		[Vector2(bounds.position.x + 5.0, 2100.0), PI],  # west wall, facing out
+		[Vector2(bounds.end.x - 5.0, 2100.0), 0.0],  # east wall
+		[Vector2(3000.0, bounds.position.y + 5.0), PI / 2.0],  # north wall
+		[Vector2(3000.0, bounds.end.y - 5.0), -PI / 2.0],  # south wall
+		[Vector2(bounds.position.x + 5.0, bounds.position.y + 5.0), PI / 4.0],  # NW corner
+		[Vector2(bounds.end.x - 5.0, bounds.position.y + 5.0), -PI / 4.0],  # NE corner
+		[Vector2(bounds.position.x + 5.0, bounds.end.y - 5.0), PI * 3.0 / 4.0],  # SW corner
+		[Vector2(bounds.end.x - 5.0, bounds.end.y - 5.0), -PI * 3.0 / 4.0],  # SE corner
+	]
+	var vessel_pairs := [["sloop", "sloop"], ["brig", "frigate"], ["frigate", "brig"]]
+	for pair in vessel_pairs:
+		for spot in spots:
+			var sim = NavalSimulation.new()
+			sim.reset("duel_%s" % pair[0], pair[1])
+			sim.ships[2]["position"] = spot[0]
+			sim.ships[2]["heading"] = spot[1]
+			sim.ships[1]["position"] = Vector2(3000, 2100)
+			sim.ships[1]["sails"] = 0.0
+			var ai = AIController.new()
+			var recovered := false
+			var finite := true
+			var full_tracks := true
+			var vessel: Dictionary = Definitions.VESSELS[pair[0]]
+			for i in 720:
+				var commands: Dictionary = ai.commands_for_tick(sim.ai_observation(), DT)
+				commands[1] = {}
+				sim.step(DT, commands)
+				var pos: Vector2 = sim.ships[2]["position"]
+				finite = finite and is_finite(pos.x) and is_finite(pos.y)
+				full_tracks = full_tracks and [sim.ships[2]["hull"], sim.ships[2]["sails"], sim.ships[2]["crew"]] \
+					== [vessel["hull"], vessel["sails"], vessel["crew"]]
+				if bounds.grow(-Definitions.AI["boundary_inset"]).has_point(pos):
+					recovered = true
+					break
+			t.check(recovered and finite and full_tracks,
+				"%s at %s facing %.2f recovers inside the safe band within 12s" % [pair[0], spot[0], spot[1]])
+
+
+## Recovery suppresses fire; reset clears recovery memory.
+func _test_recovery_details(t) -> void:
+	var sim = NavalSimulation.new()
+	sim.reset("duel_brig", "sloop")
+	var bounds := Definitions.safe_bounds(Definitions.VESSELS["brig"]["radius"])
+	sim.ships[2]["position"] = Vector2(bounds.position.x + 5.0, 2100.0)
+	sim.ships[2]["heading"] = PI
+	sim.ships[1]["sails"] = 0.0
+	var ai = AIController.new()
+	var fired_during_recovery := false
+	for i in 720:
+		var commands: Dictionary = ai.commands_for_tick(sim.ai_observation(), DT)
+		commands[1] = {}
+		var memory = ai._memory.get(2)
+		if memory != null and memory.recovering:
+			fired_during_recovery = fired_during_recovery or commands[2].get("fire_port", false) \
+				or commands[2].get("fire_starboard", false)
+		sim.step(DT, commands)
+	t.check(not fired_during_recovery, "no fire while recovering at the boundary")
+	var recovering: bool = ai._memory.has(2) and (ai._memory[2].recovering or ai._memory[2].target_id == 1)
+	t.check(recovering, "memory tracked the recovery encounter")
+	ai.reset()
+	t.check(not ai._memory.has(2), "reset clears recovery memory")

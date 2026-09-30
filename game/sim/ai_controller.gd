@@ -17,6 +17,12 @@ class ShipMemory:
 	var candidate_age := {"port": 0.0, "starboard": 0.0}
 	var last_change := {"port": 0.0, "starboard": 0.0}  # sim-time of last completed change
 	var target_id := -1
+	# Recovery (plan 03 task 4): one shared avoidance/recovery path, also used by plan 05.
+	var recovering := false
+	var recovery_heading := 0.0
+	var recovery_started := 0.0
+	var last_position := Vector2.ZERO
+	var last_progress := 0.0  # sim-time of the last displacement sample
 
 
 var _clock := 0.0  # sim seconds; the only time source
@@ -45,12 +51,31 @@ func commands_for_tick(observation: Dictionary, dt: float) -> Dictionary:
 			_memory.erase(id)  # no target or inactive opposition: no command
 			continue
 		if not _memory.has(id):
-			_memory[id] = ShipMemory.new()
+			_memory[id] = _fresh_memory(ship)
 		var memory: ShipMemory = _memory[id]
 		var command := _steer(observation, ship, target, memory)
 		_select_ammo(command, observation, ship, target, memory, dt)
+		_track_progress(memory, ship)
 		commands[id] = command
 	return commands
+
+
+func _fresh_memory(ship: Dictionary) -> ShipMemory:
+	var memory := ShipMemory.new()
+	memory.last_position = ship["position"]
+	memory.last_progress = _clock
+	return memory
+
+
+## Stuck detection: displacement below the threshold over the progress window.
+func _track_progress(memory: ShipMemory, ship: Dictionary) -> void:
+	if _clock - memory.last_progress >= Definitions.AI["progress_window_s"]:
+		if memory.last_position.distance_to(ship["position"]) < Definitions.AI["stuck_displacement"] \
+				and ship["speed"] > 20.0:
+			memory.recovering = true  # enter recovery; heading set by the avoidance pass
+			memory.recovery_started = _clock
+		memory.last_position = ship["position"]
+		memory.last_progress = _clock
 
 
 ## The single active enemy of this ship's team (this slice: the living player).
@@ -64,20 +89,131 @@ func _target_for(observation: Dictionary, ship: Dictionary) -> Dictionary:
 	return best
 
 
-## Broadside-orbit steering. Returns a neutral command with turn/sails decided.
+## Steering: avoidance/recovery first (boundary danger wins), then the broadside orbit.
 func _steer(observation: Dictionary, ship: Dictionary, target: Dictionary, memory: ShipMemory) -> Dictionary:
 	var command := _neutral_command()
+	var danger := _avoidance_heading(observation, ship, memory)
+	if danger.is_empty():
+		if memory.recovering:
+			_exit_recovery_if_clear(observation, ship, memory)
+		if not memory.recovering:
+			return _orbit(command, ship, target, memory)
+	# Recovery or predicted danger: steer the latched/avoidance heading, reefed.
+	var error := Definitions.wrap_angle(_recovery_heading(observation, ship, memory, danger) - ship["heading"])
+	command["turn"] = 0.0 if absf(error) <= Definitions.AI["turn_dead"] \
+		else clampf(error / Definitions.AI["turn_gain"], -1.0, 1.0)
+	command["toggle_sails"] = not ship["reefed"]  # reef through ordinary commands
+	return command
+
+
+## Predicted collision or boundary danger; returns a heading to steer or {} when clear.
+func _avoidance_heading(observation: Dictionary, ship: Dictionary, memory: ShipMemory) -> Dictionary:
+	var radius: float = Definitions.VESSELS[ship["vessel_id"]]["radius"]
+	var bounds := Definitions.safe_bounds(radius).grow(-Definitions.AI["boundary_inset"])
+	if not bounds.has_point(ship["position"]):
+		# Boundary danger wins: aim at the nearest point inside the deeper inset;
+		# corners combine both inward axes.
+		var deep := Definitions.safe_bounds(radius).grow(-Definitions.AI["recovery_inset"])
+		var inward := Vector2(
+			clampf(deep.get_center().x, deep.position.x, deep.end.x) - ship["position"].x,
+			clampf(deep.get_center().y, deep.position.y, deep.end.y) - ship["position"].y)
+		if inward == Vector2.ZERO:
+			inward = Definitions.ARENA_SIZE / 2.0 - ship["position"]
+		if inward == Vector2.ZERO:
+			inward = Vector2.RIGHT
+		return {"heading": inward.angle(), "kind": "boundary"}
+	var velocity: Vector2 = Vector2.from_angle(ship["heading"]) * ship["speed"]
+	for other_id in observation["ships"]:
+		if other_id == ship["id"]:
+			continue
+		var other: Dictionary = observation["ships"][other_id]
+		if not other["active"]:
+			continue
+		var relative: Vector2 = other["position"] - ship["position"]
+		if relative.length() < 1e-6:
+			# Coincident centers: even ship ID heads east, odd west (chosen once by parity).
+			return {"heading": 0.0 if int(ship["id"]) % 2 == 0 else PI, "kind": "ship", "id": other_id}
+		var other_velocity: Vector2 = Vector2.from_angle(other["heading"]) * other["speed"]
+		var closing: Vector2 = other_velocity - velocity
+		var denom: float = closing.dot(closing)
+		var t := 0.0 if denom < 0.001 else clampf(-relative.dot(closing) / denom, 0.0, Definitions.AI["look_ahead_s"])
+		var other_radius: float = Definitions.VESSELS[other["vessel_id"]]["radius"]
+		var predicted: Vector2 = relative + closing * t
+		if t > 0.0 and predicted.length() < radius + other_radius + Definitions.AI["ship_clearance"] \
+				or relative.length() <= radius + other_radius + Definitions.AI["contact_margin"]:
+			# Steer away perpendicular, biased outward from the obstacle.
+			var away: Vector2 = (ship["position"] - other["position"]).normalized()
+			var perpendicular: Vector2 = away.orthogonal()
+			var perpendicular_sign := 1.0 if int(ship["id"]) % 2 == 0 else -1.0
+			var steer: Vector2 = (away + perpendicular * perpendicular_sign * Definitions.AI["avoid_bias"]).normalized()
+			return {"heading": steer.angle(), "kind": "ship", "id": other_id}
+	return {}
+
+
+## Recovery heading latches; a new boundary danger overrides it.
+func _recovery_heading(observation: Dictionary, ship: Dictionary, memory: ShipMemory, danger: Dictionary) -> float:
+	if not danger.is_empty() and danger["kind"] == "boundary":
+		memory.recovery_heading = danger["heading"]
+		if not memory.recovering:
+			memory.recovering = true
+			memory.recovery_started = _clock
+	elif not memory.recovering:
+		if not danger.is_empty():
+			memory.recovery_heading = danger["heading"]
+		else:
+			memory.recovery_heading = _inward_heading(ship)
+		memory.recovering = true
+		memory.recovery_started = _clock
+	return memory.recovery_heading
+
+
+## Nearest safe heading pointing inside the deeper inset from the ship's position.
+func _inward_heading(ship: Dictionary) -> float:
+	var radius: float = Definitions.VESSELS[ship["vessel_id"]]["radius"]
+	var deep := Definitions.safe_bounds(radius).grow(-Definitions.AI["recovery_inset"])
+	var inward := Vector2(clampf(deep.get_center().x, deep.position.x, deep.end.x) - ship["position"].x,
+		clampf(deep.get_center().y, deep.position.y, deep.end.y) - ship["position"].y)
+	if inward == Vector2.ZERO:
+		inward = Definitions.ARENA_SIZE / 2.0 - ship["position"]
+	if inward == Vector2.ZERO:
+		inward = Vector2.RIGHT
+	return inward.angle()
+
+
+## Exit only outside the boundary warning band, clear of every active ship and safe
+## from newly predicted collisions; then reacquire the broadside side.
+func _exit_recovery_if_clear(observation: Dictionary, ship: Dictionary, memory: ShipMemory) -> void:
+	if _clock - memory.recovery_started < Definitions.AI["recovery_minimum_s"]:
+		return
+	var radius: float = Definitions.VESSELS[ship["vessel_id"]]["radius"]
+	var warn := Definitions.safe_bounds(radius).grow(-Definitions.AI["boundary_inset"])
+	if not warn.has_point(ship["position"]):
+		return  # still inside the boundary warning band
+	for other_id in observation["ships"]:
+		var other: Dictionary = observation["ships"][other_id]
+		if other_id == ship["id"] or not other["active"]:
+			continue
+		if ship["position"].distance_to(other["position"]) <= radius \
+				+ Definitions.VESSELS[other["vessel_id"]]["radius"] + Definitions.AI["recovery_exit_separation"]:
+			return
+	if not _avoidance_heading(observation, ship, memory).is_empty():
+		return  # a new obstacle threatens recovery: keep steering away
+	memory.recovering = false
+	memory.target_id = -1  # reacquire the broadside side against the live bearing
+
+
+## Broadside-orbit steering. Returns the command with turn/sails decided.
+func _orbit(command: Dictionary, ship: Dictionary, target: Dictionary, memory: ShipMemory) -> Dictionary:
 	var u: Vector2 = target["position"] - ship["position"]
 	var distance := u.length()
 	if distance < 1e-6:
-		return command  # coincident positions: recovery (plan 03 task 4) owns this
+		return command  # coincident positions: stuck detection triggers recovery
 	u /= distance
 	var bearing := u.angle()
 	if memory.target_id != target["id"]:
 		memory.target_id = target["id"]
 		memory.side = _choose_side(bearing, ship["heading"])
-	# Keep the preferred side until recovery ends or the target changes (plan 03 task 4
-	# may clear it; side survives across ticks here).
+	# Keep the preferred side until recovery ends or the target changes.
 	var tangent := Vector2(-u.y, u.x) if memory.side == "port" else Vector2(u.y, -u.x)
 	var desired_radius: float = Definitions.AI["orbit_radius"][memory.goal[memory.side]]
 	var radial: float = clampf((distance - desired_radius) / Definitions.AI["radial_gain"],
@@ -138,6 +274,8 @@ func _select_ammo(command: Dictionary, observation: Dictionary, ship: Dictionary
 				continue  # no fire on a cycling tick
 		if observed["ammo"] != memory.goal[side]:
 			continue  # drifted (e.g. reset by external cycling): re-sync before firing
+		if memory.recovering:
+			continue  # suppress firing during recovery
 		var ammo_range: float = Definitions.AMMO[observed["ammo"]]["range"]
 		var bearing_error := absf(Definitions.wrap_angle(target_bearing - broadsides[side]))
 		if observed["ready"] >= 1 and distance <= ammo_range \
