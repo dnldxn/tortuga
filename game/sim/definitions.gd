@@ -92,6 +92,13 @@ const AMMO := {
 	"grape": {"display_name": "Grape", "range": 300.0, "speed": 405.0, "damage": 5.0, "track": "crew"},
 }
 const AMMO_CYCLE: Array[String] = ["round", "chain", "grape"]
+
+## Deliberate escape (plan 04), ship-center distances. Arm at <= ARM of ANY active enemy;
+## escape after ESCAPE_SECONDS continuously > ESCAPE_DISTANCE from EVERY active enemy.
+## ESCAPE_DISTANCE must exceed the longest AMMO range.
+const ESCAPE_ARM_DISTANCE := 900.0
+const ESCAPE_DISTANCE := 1400.0
+const ESCAPE_SECONDS := 8.0
 const SIDES: Array[String] = ["port", "starboard"]  # port = heading - PI/2, starboard = heading + PI/2
 const ARC_HALF_ANGLE := 12.0 * PI / 180.0  # aim-assist cone around each broadside
 

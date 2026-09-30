@@ -4,6 +4,7 @@ extends Control
 ## Feedback ages in physics ticks.
 
 const Definitions := preload("res://sim/definitions.gd")
+const NavalSimulation := preload("res://sim/naval_simulation.gd")
 
 const COMPASS := ["E", "SE", "S", "SW", "W", "NW", "N", "NE"]
 const AIM_TEXT := {"assisted": "assisted", "outside_arc": "outside arc", "out_of_range": "out of range", "no_active_enemy": "no active enemy"}
@@ -29,6 +30,12 @@ var gun_bars := {}  # side -> Array[ProgressBar], prebuilt for the largest vesse
 var aim_labels := {}
 var feedback_labels := {}
 var _feedback := {}  # side -> remaining physics ticks
+var escape_panel: PanelContainer
+var escape_rule_label: Label
+var escape_status_label: Label
+var escape_bar: ProgressBar
+var _escape_prev_ticks := 0  # UI-local, only to notice a progress reset
+var _escape_reset_notice := false
 
 
 func _ready() -> void:
@@ -59,6 +66,26 @@ func _ready() -> void:
 		max_guns = maxi(max_guns, vessel["guns_per_side"])
 	for side in Definitions.SIDES:
 		_make_side(_corner(PRESET_BOTTOM_LEFT if side == "port" else PRESET_BOTTOM_RIGHT), side, max_guns)
+	_make_escape()
+
+
+## Top-centre escape panel (plan 04): rule line, status line and countdown bar.
+func _make_escape() -> void:
+	escape_panel = PanelContainer.new()
+	escape_panel.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(escape_panel)
+	escape_panel.set_anchors_and_offsets_preset(PRESET_CENTER_TOP, PRESET_MODE_MINSIZE, MARGIN)
+	escape_panel.grow_horizontal = GROW_DIRECTION_BOTH
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	escape_panel.add_child(box)
+	escape_rule_label = _label(box)
+	escape_status_label = _label(box)
+	for label in [escape_rule_label, escape_status_label]:
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.custom_minimum_size.x = 520  # fits between the top corner panels at 1280 wide
+	escape_bar = _bar(box, Vector2(520, 10))
 
 
 func _make_side(parent: Node, side: String, max_guns: int) -> void:
@@ -80,6 +107,8 @@ func _make_side(parent: Node, side: String, max_guns: int) -> void:
 
 func reset_effects() -> void:
 	_feedback.clear()
+	_escape_prev_ticks = 0
+	_escape_reset_notice = false
 	for label in feedback_labels.values():
 		label.text = ""
 		label.visible = false
@@ -138,6 +167,48 @@ func refresh(sim) -> void:
 		aim_labels[side].text = "Range %d · %s" % [roundi(aim["range"]), aim_text]
 		feedback_labels[side].text = "no loaded guns" if _feedback.has(side) else ""
 		feedback_labels[side].visible = _feedback.has(side)
+	_refresh_escape(sim, ship)
+
+
+## Rule/status text is derived from sim state each refresh; rounded numbers are display only.
+func _refresh_escape(sim, ship: Dictionary) -> void:
+	escape_bar.visible = false
+	if sim.preset_id == "practice":
+		escape_rule_label.text = "Escape unavailable — reset target or return via Pause."
+		escape_status_label.visible = false
+		return
+	escape_status_label.visible = true
+	var nearest := INF
+	for id in sim.ships:
+		var other: Dictionary = sim.ships[id]
+		if other["active"] and other["team"] != ship["team"]:
+			nearest = minf(nearest, ship["position"].distance_to(other["position"]))
+	var distance_text := "nearest enemy %d" % roundi(nearest) if nearest != INF else "no active enemy"
+	var arm := roundi(Definitions.ESCAPE_ARM_DISTANCE)
+	var clear := roundi(Definitions.ESCAPE_DISTANCE)
+	var ticks: int = sim.escape_clear_ticks
+	if not sim.result.is_empty():
+		_escape_reset_notice = false
+	elif ticks == 0 and _escape_prev_ticks > 0:
+		_escape_reset_notice = true
+	elif ticks > 0:
+		_escape_reset_notice = false
+	_escape_prev_ticks = ticks
+	if not sim.escape_armed:
+		escape_rule_label.text = "Escape unarmed: close to within %d of an active enemy to enable escape." % arm
+		escape_status_label.text = distance_text[0].to_upper() + distance_text.substr(1)
+		return
+	escape_rule_label.text = "Escape armed: stay farther than %d from EVERY active enemy for %s s." % [clear, Definitions.ESCAPE_SECONDS]
+	var seconds := ticks * Definitions.ESCAPE_SECONDS / NavalSimulation.escape_ticks_required(1.0 / 60.0)
+	if ticks > 0:
+		escape_status_label.text = "Breaking pursuit: %.1f / %.1f s — %s" % [
+			minf(seconds, Definitions.ESCAPE_SECONDS), Definitions.ESCAPE_SECONDS, distance_text]
+		escape_bar.visible = true
+		escape_bar.value = clampf(seconds / Definitions.ESCAPE_SECONDS, 0.0, 1.0) * 100.0
+	elif _escape_reset_notice:
+		escape_status_label.text = "Pursuit resumed — progress reset; escape remains armed. (%s)" % distance_text
+	else:
+		escape_status_label.text = "Get clear of every enemy — %s" % distance_text
 
 
 func _set_stats(rows: Dictionary, ship: Dictionary, vessel: Dictionary) -> void:

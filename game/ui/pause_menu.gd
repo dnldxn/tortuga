@@ -11,6 +11,7 @@ const Bindings := preload("res://input_bindings.gd")
 
 const GUIDANCE := "Full sails: faster · Reefed: tighter turns · Into the wind is slow, but you can still turn."
 const DUEL_GUIDANCE := "Sink the enemy, or exhaust its sails or crew. Turn a broadside toward it to fire."
+const ESCAPE_HINT := "Or escape: chain shot slows pursuers. Leave sails above zero, then use wind and open sea to break away.\n%s/%s cycle to Chain · %s/%s fire · %s toggle sails (keep full) · %s/%s steer downwind"
 const AMMO_HELP := "Round: hull / Chain: sails / Grape: crew · Changing ammo restarts that side's reload."
 
 var resume_button: Button
@@ -59,7 +60,13 @@ func _ready() -> void:
 
 ## Refreshed on every pause so guidance matches the encounter and bindings are live.
 func show_help(sim) -> void:
-	guidance_label.text = DUEL_GUIDANCE if sim.preset_id != "practice" else GUIDANCE
+	guidance_label.text = GUIDANCE
+	if sim.preset_id != "practice":
+		guidance_label.text = DUEL_GUIDANCE + "\n" + ESCAPE_HINT % [
+			Bindings.binding_label("cycle_port"), Bindings.binding_label("cycle_starboard"),
+			Bindings.binding_label("fire_port"), Bindings.binding_label("fire_starboard"),
+			Bindings.binding_label("toggle_sails"),
+			Bindings.binding_label("turn_left"), Bindings.binding_label("turn_right")]
 	bindings_label.text = "%s/%s steer · %s sails · %s pause · %s reset\n%s fire Port · %s fire Starboard · %s cycle Port · %s cycle Starboard" % [
 		Bindings.binding_label("turn_left"), Bindings.binding_label("turn_right"),
 		Bindings.binding_label("toggle_sails"), Bindings.binding_label("pause"),

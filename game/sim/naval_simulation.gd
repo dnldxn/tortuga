@@ -19,6 +19,8 @@ var selected_vessel_id: String = ""
 var wind_heading: float = 0.0
 var result: Dictionary = {}
 var next_projectile_id: int = 1
+var escape_armed: bool = false
+var escape_clear_ticks: int = 0  # consecutive qualifying fixed steps
 
 
 ## Fresh ship record with full tracks and fully loaded round shot on both sides.
@@ -95,6 +97,8 @@ func reset(new_preset_id: String, vessel_id: String) -> void:
 	events = []
 	result = {}
 	next_projectile_id = 1
+	escape_armed = false
+	escape_clear_ticks = 0
 	ships = {
 		PLAYER_ID: make_ship(PLAYER_ID, TEAM_PLAYER, vessel_id, preset["player_position"], preset["player_heading"]),
 	}
@@ -135,33 +139,23 @@ func step(dt: float, commands: Dictionary) -> void:
 				_fire(ships[id], side)
 	_apply_damage(_advance_projectiles(dt, acting))
 	elapsed += dt
-	_resolve_combat_result()
+	_resolve_combat_result()  # combat outcomes take precedence over escape
+	_update_escape(dt)
 
 
 ## Duel outcome after 02's damage/defeat pass. Practice and already-resolved matches
-## stay empty; the player's team is counted, never a hardcoded enemy ID. Plan 04's
-## escape resolution joins here.
+## stay empty; the player's team is counted, never a hardcoded enemy ID.
 func _resolve_combat_result() -> void:
 	if preset_id == "practice" or not result.is_empty():
 		return
 	var player_active := false
 	var opposition_active := 0
-	var defeated := []
-	var ids: Array = ships.keys()
-	ids.sort()
-	for id in ids:
+	for id in ships:
 		var ship: Dictionary = ships[id]
 		if ship["team"] == TEAM_PLAYER:
 			player_active = player_active or ship["active"]
 		else:
 			opposition_active += 1 if ship["active"] else 0
-		if not ship["active"]:
-			var reasons: Array = ship["defeat_reasons"]
-			defeated.append({
-				"ship_id": id,
-				"reason": "sunk" if "sunk" in reasons else "disabled",
-				"disabled_by": reasons.filter(func(r): return r != "sunk"),
-			})
 	var outcome := ""
 	if player_active and opposition_active == 0:
 		outcome = "victory"
@@ -171,7 +165,58 @@ func _resolve_combat_result() -> void:
 		outcome = "draw"
 	if outcome == "":
 		return
-	result = {"outcome": outcome, "elapsed": elapsed, "defeated": defeated}
+	result = {"outcome": outcome, "elapsed": elapsed, "defeated": _defeated()}
+
+
+## Sorted-by-ID defeat records shared by every result outcome.
+func _defeated() -> Array:
+	var defeated := []
+	var ids: Array = ships.keys()
+	ids.sort()
+	for id in ids:
+		var reasons: Array = ships[id]["defeat_reasons"]
+		if not ships[id]["active"]:
+			defeated.append({
+				"ship_id": id,
+				"reason": "sunk" if "sunk" in reasons else "disabled",
+				"disabled_by": reasons.filter(func(r): return r != "sunk"),
+			})
+	return defeated
+
+
+## Plan 04 deliberate escape, after combat resolution on resolved fixed-step positions.
+## Arms at <= ESCAPE_ARM_DISTANCE of any active enemy; completes after ESCAPE_SECONDS of
+## consecutive steps with every active enemy strictly beyond ESCAPE_DISTANCE.
+## Integer ticks assume the fixed 1/60 dt (no fractional accumulation).
+func _update_escape(dt: float) -> void:
+	if preset_id == "practice":
+		escape_armed = false
+		escape_clear_ticks = 0
+		return
+	if not result.is_empty():
+		return
+	var player: Dictionary = ships.get(PLAYER_ID, {})
+	if player.is_empty() or not player["active"]:
+		return
+	var d2 := INF
+	for id in ships:
+		var other: Dictionary = ships[id]
+		if other["active"] and other["team"] != player["team"]:
+			d2 = minf(d2, player["position"].distance_squared_to(other["position"]))
+	if d2 == INF:
+		return  # no active enemy
+	if d2 <= Definitions.ESCAPE_ARM_DISTANCE * Definitions.ESCAPE_ARM_DISTANCE:
+		escape_armed = true
+	if not escape_armed or d2 <= Definitions.ESCAPE_DISTANCE * Definitions.ESCAPE_DISTANCE:
+		escape_clear_ticks = 0
+		return
+	escape_clear_ticks += 1
+	if escape_clear_ticks >= escape_ticks_required(dt):
+		result = {"outcome": "escaped", "reason": "pursuit_broken", "elapsed": elapsed, "defeated": _defeated()}
+
+
+static func escape_ticks_required(dt: float) -> int:
+	return roundi(Definitions.ESCAPE_SECONDS / dt)
 
 
 ## Copied, non-aliasing view for the AI: contract fields only, no live nested

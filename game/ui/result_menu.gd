@@ -7,7 +7,8 @@ signal return_requested
 const Definitions := preload("res://sim/definitions.gd")
 const SelectionMenu := preload("res://ui/selection_menu.gd")
 
-const OUTCOME_TEXT := {"victory": "Victory", "defeat": "Defeat", "draw": "Draw"}
+const OUTCOME_TEXT := {"victory": "Victory", "defeat": "Defeat", "draw": "Draw", "escaped": "Escaped"}
+const ESCAPE_REASON := "Escaped — you broke pursuit while an opponent remained operational."
 
 var title_label: Label
 var detail_label: Label
@@ -47,6 +48,8 @@ func _ready() -> void:
 func show_result(sim) -> void:
 	title_label.text = OUTCOME_TEXT[sim.result["outcome"]]
 	var lines := ["Time %.1fs" % sim.result["elapsed"]]
+	if sim.result["outcome"] == "escaped":
+		lines.push_front(ESCAPE_REASON)
 	for d in sim.result["defeated"]:
 		var ship: Dictionary = sim.ships[d["ship_id"]]
 		var name := "Enemy A" if ship["team"] == 1 else "You"
