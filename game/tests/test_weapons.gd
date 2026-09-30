@@ -72,7 +72,7 @@ func _vec_near(a: Vector2, b: Vector2, eps: float) -> bool:
 # --- definitions / reload math -------------------------------------------------
 
 func _test_definitions(t) -> void:
-	var expected := {"round": [900.0, 600.0, 8.0, "hull"], "chain": [600.0, 500.0, 6.0, "sails"], "grape": [300.0, 450.0, 5.0, "crew"]}
+	var expected := {"round": [900.0, 540.0, 8.0, "hull"], "chain": [600.0, 450.0, 6.0, "sails"], "grape": [300.0, 405.0, 5.0, "crew"]}
 	for ammo in expected:
 		var a: Dictionary = Definitions.AMMO.get(ammo, {})
 		t.check([a.get("range"), a.get("speed"), a.get("damage"), a.get("track")] == expected[ammo], "%s ammo definition" % ammo)

@@ -6,9 +6,9 @@ const NavalSimulation := preload("res://sim/naval_simulation.gd")
 const DT := 1.0 / 60.0
 
 const EXPECTED_VESSELS := {
-	"sloop": {"full_speed": 180.0, "turn_rate": 1.2, "hull": 100.0, "sails": 70.0, "crew": 60.0, "guns_per_side": 4, "base_reload": 7.0, "radius": 22.0},
-	"brig": {"full_speed": 145.0, "turn_rate": 0.85, "hull": 160.0, "sails": 100.0, "crew": 90.0, "guns_per_side": 6, "base_reload": 8.0, "radius": 28.0},
-	"frigate": {"full_speed": 110.0, "turn_rate": 0.6, "hull": 240.0, "sails": 140.0, "crew": 140.0, "guns_per_side": 8, "base_reload": 9.0, "radius": 34.0},
+	"sloop": {"full_speed": 162.0, "turn_rate": 1.2, "hull": 100.0, "sails": 70.0, "crew": 60.0, "guns_per_side": 4, "base_reload": 7.0, "radius": 22.0},
+	"brig": {"full_speed": 130.5, "turn_rate": 0.85, "hull": 160.0, "sails": 100.0, "crew": 90.0, "guns_per_side": 6, "base_reload": 8.0, "radius": 28.0},
+	"frigate": {"full_speed": 99.0, "turn_rate": 0.6, "hull": 240.0, "sails": 140.0, "crew": 140.0, "guns_per_side": 8, "base_reload": 9.0, "radius": 34.0},
 }
 
 
@@ -165,21 +165,21 @@ func _test_wind_multiplier(t) -> void:
 
 
 func _test_speed_fixtures(t) -> void:
-	var cases := {0.0: 144.0, 45.0: 180.0, 90.0: 171.0, 180.0: 21.6}
+	var cases := {0.0: 129.6, 45.0: 162.0, 90.0: 153.9, 180.0: 19.44}
 	for deg in cases:
 		t.near(_tick(_sim("sloop", deg_to_rad(deg)))["speed"], cases[deg], 1e-4, "sloop speed at %s deg" % deg)
-	t.near(_tick(_sim(), {1: {"toggle_sails": true}})["speed"], 93.6, 1e-4, "sloop reefed downwind speed")
+	t.near(_tick(_sim(), {1: {"toggle_sails": true}})["speed"], 84.24, 1e-4, "sloop reefed downwind speed")
 
 
 func _test_sail_fractions(t) -> void:
-	var cases := {70.0: 144.0, 35.0: 93.6, 7.0: 53.28, 0.0: 0.0}
+	var cases := {70.0: 129.6, 35.0: 84.24, 7.0: 47.952, 0.0: 0.0}
 	for sails in cases:
 		var sim = _sim()
 		sim.ships[1]["sails"] = sails
 		t.near(_tick(sim)["speed"], cases[sails], 1e-4, "sloop speed with %s sails" % sails)
 	var over = _sim()
 	over.ships[1]["sails"] = 140.0
-	t.near(_tick(over)["speed"], 144.0, 1e-4, "sail fraction clamps above 1")
+	t.near(_tick(over)["speed"], 129.6, 1e-4, "sail fraction clamps above 1")
 
 
 func _test_turning(t) -> void:
@@ -230,10 +230,10 @@ func _test_toggle(t) -> void:
 	for i in 59:
 		_tick(sim)
 	t.check(sim.ships[1]["reefed"] == true, "toggle once then 59 neutral ticks stays reefed")
-	t.near(sim.ships[1]["speed"], 93.6, 1e-4, "reefed speed persists")
+	t.near(sim.ships[1]["speed"], 84.24, 1e-4, "reefed speed persists")
 	_tick(sim, {1: {"toggle_sails": true}})
 	t.check(sim.ships[1]["reefed"] == false, "second toggle restores full sails")
-	t.near(sim.ships[1]["speed"], 144.0, 1e-4, "full sails speed restored")
+	t.near(sim.ships[1]["speed"], 129.6, 1e-4, "full sails speed restored")
 
 
 func _test_neutral_movement(t) -> void:
@@ -241,7 +241,7 @@ func _test_neutral_movement(t) -> void:
 	for i in 60:
 		_tick(sim)
 	var p: Vector2 = sim.ships[1]["position"]
-	t.near(p.x, 2500.0 + 144.0, 0.02, "60 neutral ticks move +144 x")
+	t.near(p.x, 2500.0 + 129.6, 0.02, "60 neutral ticks move +129.6 x")
 	t.near(p.y, 2100.0, 0.02, "60 neutral ticks keep y")
 
 
@@ -270,7 +270,7 @@ func _test_damage_keeps_handling(t) -> void:
 
 func _test_upwind_recovery(t) -> void:
 	var sim = _sim("sloop", PI)
-	t.near(_tick(sim)["speed"], 21.6, 1e-4, "directly upwind speed")
+	t.near(_tick(sim)["speed"], 19.44, 1e-4, "directly upwind speed")
 	for i in 90:
 		_tick(sim, {1: {"turn": 1.0}})
 	t.near(sim.ships[1]["heading"], -PI + 90.0 * 0.02, 1e-6, "upwind steering keeps full rate")

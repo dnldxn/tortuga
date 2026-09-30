@@ -112,7 +112,7 @@ func _test_range_endpoint(t) -> void:
 
 
 func _test_travel(t) -> void:
-	for c in [["round", 900.0, 90], ["chain", 600.0, 72], ["grape", 300.0, 40]]:
+	for c in [["round", 900.0, 100], ["chain", 600.0, 80], ["grape", 300.0, 45]]:
 		var sim = _sim_with([_ship(1, 0, "sloop", Vector2(2500, 2100))])
 		sim.ships[1]["weapons"]["port"] = {"ammo": c[0], "loads": [1.0, 0.0, 0.0, 0.0]}
 		sim.step(DT, {1: {"fire_port": true}})
@@ -301,7 +301,7 @@ func _test_damage_effects(t) -> void:
 	# Chain brings sails 56 -> 50 (half): next tick speed uses .3+.7*.5 = .65.
 	var sim = _hit_brig("chain", [160.0, 56.0, 90.0])
 	sim.step(DT, {})
-	t.near(sim.ships[2]["speed"], 145.0 * 0.8 * 0.65, 1e-4, "half sails after chain: .65 speed scale")
+	t.near(sim.ships[2]["speed"], 130.5 * 0.8 * 0.65, 1e-4, "half sails after chain: .65 speed scale")
 	# Grape brings crew 50 -> 45 (half): this tick reloads at pre-damage crew, next at .625.
 	var brig := _ship(2, 1, "brig", Vector2(3000, 2100))
 	brig["crew"] = 50.0

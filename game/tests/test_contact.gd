@@ -204,8 +204,8 @@ func _test_through_step(t) -> void:
 		var sim = _sim_with([a, b, c], reverse)
 		sim.result = {}  # plan 03: a resolved result freezes stepping; test the live path
 		sim.step(DT, {})
-		t.near(sim.ships[1]["speed"], 144.0, 1e-4, "step: contact keeps requested downwind speed (reverse=%s)" % reverse)
-		t.near(sim.ships[2]["speed"], 21.6, 1e-4, "step: contact keeps requested upwind speed (reverse=%s)" % reverse)
+		t.near(sim.ships[1]["speed"], 129.6, 1e-4, "step: contact keeps requested downwind speed (reverse=%s)" % reverse)
+		t.near(sim.ships[2]["speed"], 19.44, 1e-4, "step: contact keeps requested upwind speed (reverse=%s)" % reverse)
 		t.check(sim.ships[1]["heading"] == 0.0 and absf(sim.ships[2]["heading"]) == PI, "step: contact keeps headings (reverse=%s)" % reverse)
 		t.check(_worst_penetration(_active(sim)) <= TOL, "step: resolved contact (reverse=%s)" % reverse)
 		t.check(sim.ships[3] == c, "step: inactive ships untouched (reverse=%s)" % reverse)
@@ -213,7 +213,7 @@ func _test_through_step(t) -> void:
 	out.result = {}  # plan 03: a resolved result freezes stepping; test the live path
 	out.step(DT, {})
 	t.check(out.ships[1]["position"] == _edge("sloop", Vector2.RIGHT), "step: ship sailing into wall stays on safe bound")
-	t.near(out.ships[1]["speed"], 144.0, 1e-4, "step: wall-blocked ship keeps requested speed")
+	t.near(out.ships[1]["speed"], 129.6, 1e-4, "step: wall-blocked ship keeps requested speed")
 
 
 ## Ship at the west bound facing out (west): turn inward 180 ticks, neutral 420 ticks.
