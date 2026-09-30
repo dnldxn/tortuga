@@ -108,6 +108,7 @@ const AI := {
 	"contact_margin": 6.0,
 	"progress_window_s": 1.0,
 	"stuck_displacement": 8.0,
+	"stuck_min_speed": 20.0,
 	"recovery_minimum_s": 1.5,
 	"recovery_exit_separation": 100.0,
 	"recovery_inset": 150.0,

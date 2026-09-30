@@ -303,11 +303,12 @@ func _draw_marker() -> void:
 		return
 	var screen := Rect2(Vector2.ZERO, marker_canvas.size)
 	var target: Vector2 = enemy["position"]
-	var marker := target_marker(camera.position, target, screen)
+	var center := camera.get_screen_center_position()  # actual center after limit clamping
+	var marker := target_marker(center, target, screen)
 	if not marker["offscreen"]:
 		return  # on-screen enemies need no arrow
 	var p: Vector2 = marker["position"]
-	var direction: Vector2 = (target - camera.position).normalized()
+	var direction: Vector2 = (target - center).normalized()
 	var across := direction.orthogonal()
 	var ink := ENEMY_INK if sim.preset_id != "practice" else TARGET_INK
 	marker_canvas.draw_colored_polygon(PackedVector2Array([p + direction * 14, p - direction * 8 + across * 9,

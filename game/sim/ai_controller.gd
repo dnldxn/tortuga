@@ -23,6 +23,7 @@ class ShipMemory:
 	var recovery_started := 0.0
 	var last_position := Vector2.ZERO
 	var last_progress := 0.0  # sim-time of the last displacement sample
+	var recovery_obstacle := -1  # ship id that set the latched heading (-1: boundary/stuck)
 
 
 var _clock := 0.0  # sim seconds; the only time source
@@ -71,9 +72,11 @@ func _fresh_memory(ship: Dictionary) -> ShipMemory:
 func _track_progress(memory: ShipMemory, ship: Dictionary) -> void:
 	if _clock - memory.last_progress >= Definitions.AI["progress_window_s"]:
 		if memory.last_position.distance_to(ship["position"]) < Definitions.AI["stuck_displacement"] \
-				and ship["speed"] > 20.0:
-			memory.recovering = true  # enter recovery; heading set by the avoidance pass
+				and ship["speed"] > Definitions.AI["stuck_min_speed"] and not memory.recovering:
+			memory.recovering = true
 			memory.recovery_started = _clock
+			memory.recovery_heading = _inward_heading(ship)
+			memory.recovery_obstacle = -1
 		memory.last_position = ship["position"]
 		memory.last_progress = _clock
 
@@ -99,7 +102,7 @@ func _steer(observation: Dictionary, ship: Dictionary, target: Dictionary, memor
 		if not memory.recovering:
 			return _orbit(command, ship, target, memory)
 	# Recovery or predicted danger: steer the latched/avoidance heading, reefed.
-	var error := Definitions.wrap_angle(_recovery_heading(observation, ship, memory, danger) - ship["heading"])
+	var error := Definitions.wrap_angle(_recovery_heading(ship, memory, danger) - ship["heading"])
 	command["turn"] = 0.0 if absf(error) <= Definitions.AI["turn_dead"] \
 		else clampf(error / Definitions.AI["turn_gain"], -1.0, 1.0)
 	command["toggle_sails"] = not ship["reefed"]  # reef through ordinary commands
@@ -110,7 +113,9 @@ func _steer(observation: Dictionary, ship: Dictionary, target: Dictionary, memor
 func _avoidance_heading(observation: Dictionary, ship: Dictionary, memory: ShipMemory) -> Dictionary:
 	var radius: float = Definitions.VESSELS[ship["vessel_id"]]["radius"]
 	var bounds := Definitions.safe_bounds(radius).grow(-Definitions.AI["boundary_inset"])
-	if not bounds.has_point(ship["position"]):
+	var velocity: Vector2 = Vector2.from_angle(ship["heading"]) * ship["speed"]
+	var predicted_self: Vector2 = ship["position"] + velocity * Definitions.AI["look_ahead_s"]
+	if not bounds.has_point(predicted_self):
 		# Boundary danger wins: aim at the nearest point inside the deeper inset;
 		# corners combine both inward axes.
 		var deep := Definitions.safe_bounds(radius).grow(-Definitions.AI["recovery_inset"])
@@ -122,7 +127,6 @@ func _avoidance_heading(observation: Dictionary, ship: Dictionary, memory: ShipM
 		if inward == Vector2.ZERO:
 			inward = Vector2.RIGHT
 		return {"heading": inward.angle(), "kind": "boundary"}
-	var velocity: Vector2 = Vector2.from_angle(ship["heading"]) * ship["speed"]
 	for other_id in observation["ships"]:
 		if other_id == ship["id"]:
 			continue
@@ -150,20 +154,18 @@ func _avoidance_heading(observation: Dictionary, ship: Dictionary, memory: ShipM
 	return {}
 
 
-## Recovery heading latches; a new boundary danger overrides it.
-func _recovery_heading(observation: Dictionary, ship: Dictionary, memory: ShipMemory, danger: Dictionary) -> float:
-	if not danger.is_empty() and danger["kind"] == "boundary":
-		memory.recovery_heading = danger["heading"]
-		if not memory.recovering:
-			memory.recovering = true
-			memory.recovery_started = _clock
-	elif not memory.recovering:
-		if not danger.is_empty():
-			memory.recovery_heading = danger["heading"]
-		else:
-			memory.recovery_heading = _inward_heading(ship)
+## Recovery heading latches; boundary danger or a newly threatening ship overrides it.
+func _recovery_heading(ship: Dictionary, memory: ShipMemory, danger: Dictionary) -> float:
+	if not memory.recovering:
 		memory.recovering = true
 		memory.recovery_started = _clock
+		memory.recovery_heading = _inward_heading(ship)
+		memory.recovery_obstacle = -1
+	if not danger.is_empty():
+		var obstacle: int = danger.get("id", -1)
+		if danger["kind"] == "boundary" or obstacle != memory.recovery_obstacle:
+			memory.recovery_heading = danger["heading"]
+			memory.recovery_obstacle = obstacle
 	return memory.recovery_heading
 
 

@@ -17,6 +17,7 @@ func run(t) -> bool:
 	_test_enemy_hud_block(t)
 	_test_result_and_replay(t)
 	_test_input_isolation(t)
+	test_disabled_text(t)
 	main.free()
 	return true
 
@@ -167,3 +168,19 @@ func _snapshot() -> Dictionary:
 	return {"ships": sim.ships.duplicate(true), "projectiles": sim.projectiles.duplicate(true),
 		"events": sim.events.duplicate(true), "elapsed": sim.elapsed, "result": sim.result.duplicate(true),
 		"next_projectile_id": sim.next_projectile_id}
+
+
+## Disabled reasons read naturally in the result text.
+func test_disabled_text(t) -> void:
+	main.start_encounter("duel_brig", "sloop")
+	main.sim.ships[2]["sails"] = 3.0
+	main.sim.ships[2]["crew"] = 3.0
+	for ammo in ["chain", "grape"]:
+		main.sim.projectiles.append({"id": main.sim.next_projectile_id, "owner_id": 1, "ammo": ammo,
+			"position": main.sim.ships[2]["position"] - Vector2(0, 10), "direction": Vector2.DOWN,
+			"remaining_range": 300.0, "owner_cleared": true})
+		main.sim.next_projectile_id += 1
+	main.advance_tick()
+	t.check("Enemy A (Brig) disabled: sails and crew exhausted." in main.result_menu.detail_label.text,
+		"disabled result names both exhausted tracks")
+	main.return_to_selection()

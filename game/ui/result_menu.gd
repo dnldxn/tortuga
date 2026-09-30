@@ -53,7 +53,7 @@ func show_result(sim) -> void:
 		if d["reason"] == "sunk":
 			lines.append("%s (%s) sunk." % [name, Definitions.VESSELS[ship["vessel_id"]]["display_name"]])
 		else:
-			var cause := " and ".join(d["disabled_by"]).capitalize()
+			var cause := " and ".join(PackedStringArray(d["disabled_by"]))
 			lines.append("%s (%s) disabled: %s exhausted." % [name, Definitions.VESSELS[ship["vessel_id"]]["display_name"], cause])
 	detail_label.text = "\n".join(lines)
 	visible = true

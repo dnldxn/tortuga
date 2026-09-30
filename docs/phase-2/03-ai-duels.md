@@ -22,7 +22,7 @@ lands, the raw harness is canonical):
 |---|---|
 | `--version` | 4.7.2.stable.official.ed1daf0bf |
 | `--import` | exit 0, no parse/resource errors |
-| Full harness before plan 06 wrapper | **1464 checks, 0 failures**, both new suites (`test_ai_duels.gd`, `test_duel_ui.gd`) included |
+| Full harness before plan 06 wrapper | **1465 checks, 0 failures**, both new suites (`test_ai_duels.gd`, `test_duel_ui.gd`) included |
 | Upstream suites (sailing/contact/controller/view/weapons/projectile/practice) | green throughout |
 
 Suite additions: `test_ai_duels.gd` (reset matrix, observation/AI purity, steering,
@@ -63,9 +63,9 @@ command maps back to player 1. No production autopilot exists.
 
 | Pair | First firing opportunity | Contacts / wall pins ≥12s | Outcome |
 |---|---|---|---|
-| duel_sloop / sloop | tick 163 (2.7s) | none (worst 0 ticks) | victory at 93.2s |
-| duel_brig / brig | tick 142 (2.4s) | none (worst 0 ticks) | victory at 46.6s |
-| duel_frigate / frigate | tick 216 (3.6s) | none (worst 0 ticks) | victory at 46.6s |
+| duel_sloop / sloop | tick 163 (2.7s) | none (worst 0 ticks) | victory at 111.6s |
+| duel_brig / brig | tick 142 (2.4s) | none (worst 0 ticks) | draw at 44.5s |
+| duel_frigate / frigate | tick 216 (3.6s) | none (worst 0 ticks) | victory at 45.8s |
 
 No passive orbiting observed: all three pairs resolved well inside 240s with active
 firing from the opening minutes. 2–4 minute comparable-vessel duels remain a
@@ -90,7 +90,8 @@ success cannot establish rendered usability — this table stays open until then
 All AI values are initial, unmeasured (centralized in `Definitions.AI`): orbit radii
 520/380/190, radial gain 160, turn dead band 3°, reef 35°/full-sail 15°, ammo
 hysteresis 1.0s candidate + 10.0s switch cooldown, avoidance look-ahead 0.75s,
-ship clearance 60, boundary inset 50, recovery minimum 1.5s, exit separation 100.
+ship clearance 60, boundary inset 50 (tested against 0.75s predicted position), stuck
+8 units/1s above speed 20, recovery minimum 1.5s, exit separation 100.
 Damaged crews reload slower than the dwell; watch for wasteful resets and tune
 with evidence. Practice and plan-02 behavior is untouched; plan 04 adds escape
 resolution at the same `_resolve_combat_result` seam; plan 05 extends the shared
