@@ -383,7 +383,7 @@ func _test_weapon_hud(t) -> void:
 	main.sim.ships[2]["active"] = false
 	main.sim.ships[2]["defeat_reasons"] = ["sails", "crew"]
 	hud.refresh(main.sim)
-	t.check("sails, crew" in _all_text(hud) and "no active enemy" in _all_text(hud),
+	t.check("SAILS · CREW" in _all_text(hud) and "no active enemy" in _all_text(hud),
 		"defeated target reasons and inactive aim are visible")
 	main.start_practice("sloop")
 

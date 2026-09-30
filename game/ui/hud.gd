@@ -5,7 +5,7 @@ const Definitions := preload("res://sim/definitions.gd")
 const Bindings := preload("res://input_bindings.gd")
 
 const GUIDANCE := "Full sails: faster · Reefed: tighter turns · Into the wind is slow, but you can still turn."
-const BANNER := "TARGET · Brig"
+const DUEL_GUIDANCE := "Sink the enemy, or exhaust its sails or crew. Turn a broadside toward it to fire."
 const COMPASS := ["east", "southeast", "south", "southwest", "west", "northwest", "north", "northeast"]
 const AIM_TEXT := {"assisted": "assisted", "outside_arc": "outside arc", "out_of_range": "out of range", "no_active_enemy": "no active enemy"}
 
@@ -17,6 +17,7 @@ var wind_label: Label
 var wind_arrow: Control
 var wind_heading := 0.0
 var bindings_label: Label
+var guidance_label: Label
 var target_label: Label
 var side_labels := {}
 var feedback_labels := {}
@@ -74,7 +75,7 @@ func _ready() -> void:
 	fill.mouse_filter = MOUSE_FILTER_IGNORE
 	column.add_child(fill)
 	var help := VBoxContainer.new()
-	var guidance_label := _label(help)
+	guidance_label = _label(help)
 	guidance_label.text = GUIDANCE
 	_label(help).text = "Round: hull / Chain: sails / Grape: crew · Changing ammo restarts that side's reload."
 	bindings_label = _label(help)
@@ -111,6 +112,7 @@ func refresh(sim) -> void:
 	var ship: Dictionary = sim.ships.get(sim.PLAYER_ID, {})
 	if ship.is_empty():
 		return
+	guidance_label.text = DUEL_GUIDANCE if sim.preset_id != "practice" else GUIDANCE
 	var vessel: Dictionary = Definitions.VESSELS[ship["vessel_id"]]
 	name_label.text = vessel["display_name"]
 	condition_label.text = "Hull %d/%d · Sails %d/%d · Crew %d/%d" % [
@@ -124,10 +126,14 @@ func refresh(sim) -> void:
 	var target: Dictionary = sim.ships.get(2, {})
 	if not target.is_empty():
 		var target_vessel: Dictionary = Definitions.VESSELS[target["vessel_id"]]
-		var reason := " · DEFEATED: %s" % ", ".join(target["defeat_reasons"]) if not target["active"] else ""
-		target_label.text = "%s%s\nHull %d/%d · Sails %d/%d\nCrew %d/%d" % [BANNER, reason,
-			target["hull"], target_vessel["hull"], target["sails"], target_vessel["sails"],
-			target["crew"], target_vessel["crew"]]
+		var title := "Enemy A (%s)" % target_vessel["display_name"] if sim.preset_id != "practice" else "TARGET · Brig"
+		var condition := " · ".join([
+			"Hull %d/%d" % [target["hull"], target_vessel["hull"]],
+			"Sails %d/%d" % [target["sails"], target_vessel["sails"]],
+			"Crew %d/%d" % [target["crew"], target_vessel["crew"]]])
+		var distance := roundi(target["position"].distance_to(ship["position"]))
+		var state := "Active" if target["active"] else " · ".join(target["defeat_reasons"]).to_upper()
+		target_label.text = "%s\n%s\nDistance %d\n%s" % [title, condition, distance, state]
 	for side in Definitions.SIDES:
 		var weapon: Dictionary = ship["weapons"][side]
 		var loads: Array = weapon["loads"]

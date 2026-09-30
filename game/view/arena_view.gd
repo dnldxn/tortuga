@@ -24,6 +24,13 @@ const LIMIT := Color(1.0, 0.92, 0.55)
 const WARNING := "Shallows / Turn back"
 const TARGET_INK := Color(1.0, 0.9, 0.55)
 const SHOT_INK := Color(1.0, 0.98, 0.85)
+const ENEMY_INK := Color(1.0, 0.62, 0.45)
+const ZOOM_MIN := 0.65
+const ZOOM_MAX := 1.0
+const FIT_MARGIN_X := 120.0
+const FIT_MARGIN_Y := 240.0
+const ZOOM_SMOOTH := 6.0
+const MARKER_INSET := 24.0
 
 var main: Node
 var camera := Camera2D.new()
@@ -60,7 +67,7 @@ func reset_effects() -> void:
 func target_marker(center: Vector2, target: Vector2, screen: Rect2) -> Dictionary:
 	var mid := screen.position + screen.size * 0.5
 	var projected := mid + (target - center) * camera.zoom
-	var safe := screen.grow(-32)
+	var safe := screen.grow(-MARKER_INSET)
 	return {"offscreen": not safe.has_point(projected), "position": projected.clamp(safe.position, safe.end)}
 
 
@@ -86,9 +93,50 @@ func _ready() -> void:
 	main.mode_changed.connect(func(_mode: String) -> void: sync(main.sim))
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	sync(main.sim)
+	_fit_camera(delta)
 	marker_canvas.queue_redraw()
+
+
+## Smoothed duel framing: zoom out to fit player and active enemy, center between
+## them clamped to the arena. Practice keeps zoom 1 on the player.
+func _fit_camera(delta: float) -> void:
+	var sim = main.sim
+	if not sim.ships.has(sim.PLAYER_ID):
+		return
+	var player: Vector2 = sim.ships[sim.PLAYER_ID]["position"]
+	var enemy: Variant = _active_enemy(sim)
+	var desired_zoom := 1.0
+	var screen := get_viewport_rect().size
+	if enemy != null:
+		var offset: Vector2 = enemy["position"] - player
+		desired_zoom = clampf(minf((screen.x - FIT_MARGIN_X) / (2.0 * maxf(absf(offset.x), 1.0)),
+			(screen.y - FIT_MARGIN_Y) / (2.0 * maxf(absf(offset.y), 1.0))), ZOOM_MIN, ZOOM_MAX)
+	camera.zoom = camera.zoom.lerp(Vector2.ONE * desired_zoom, 1.0 - exp(-ZOOM_SMOOTH * maxf(delta, 0.0)))
+	# Clamp the center so the viewport stays inside the arena where it is wider than it.
+	var half: Vector2 = screen / (2.0 * camera.zoom.x)
+	var desired_center := _desired_camera_center(sim)
+	var clamped := desired_center
+	if Definitions.ARENA_SIZE.x > half.x * 2.0:
+		clamped.x = clampf(desired_center.x, half.x, Definitions.ARENA_SIZE.x - half.x)
+	if Definitions.ARENA_SIZE.y > half.y * 2.0:
+		clamped.y = clampf(desired_center.y, half.y, Definitions.ARENA_SIZE.y - half.y)
+	camera.position = clamped
+	queue_redraw()
+
+
+## Lowest-ID active opposition ship in a duel (practice targets are not framed).
+func _active_enemy(sim) -> Variant:
+	if sim.preset_id == "practice":
+		return null
+	var best: Variant = null
+	for id in sim.ships:
+		var ship: Dictionary = sim.ships[id]
+		if ship["team"] == sim.TEAM_OPPOSITION and ship["active"]:
+			if best == null or ship["id"] < best["id"]:
+				best = ship
+	return best
 
 
 ## Reconciles ship nodes with sim.ships by stable id and points the camera at the player.
@@ -113,13 +161,23 @@ func sync(sim) -> void:
 			patch.scale = REEFED_SAIL_SCALE if ship["reefed"] else Vector2.ONE
 			patch.color = Color(0.96, 0.93, 0.84, 0.95).lerp(Color(0.48, 0.42, 0.36), 1.0 - ship["sails"] / condition["sails"])
 	if sim.ships.has(sim.PLAYER_ID):
-		camera.position = sim.ships[sim.PLAYER_ID]["position"]
+		# Raw follow target; _fit_camera refines zoom/center each process frame.
+		camera.position = _desired_camera_center(sim)
 	queue_redraw()
+
+
+func _desired_camera_center(sim) -> Vector2:
+	var player: Vector2 = sim.ships[sim.PLAYER_ID]["position"]
+	var enemy: Variant = _active_enemy(sim)
+	if enemy == null:
+		return player
+	return (player + enemy["position"]) / 2.0
 
 
 func _on_practice_started() -> void:
 	sync(main.sim)
 	camera.reset_smoothing()
+	_fit_camera(0.0)
 
 
 func _make_ship(vessel_id: String) -> Sprite2D:
@@ -237,21 +295,31 @@ func _draw_combat() -> void:
 
 
 func _draw_marker() -> void:
-	if main == null or main.sim.ships.is_empty() or not main.sim.ships.has(2):
+	if main == null or main.sim.ships.is_empty():
+		return
+	var sim = main.sim
+	var enemy = _active_enemy(sim)
+	if enemy == null:
 		return
 	var screen := Rect2(Vector2.ZERO, marker_canvas.size)
-	var target: Vector2 = main.sim.ships[2]["position"]
-	var marker := target_marker(camera.get_screen_center_position(), target, screen)
+	var target: Vector2 = enemy["position"]
+	var marker := target_marker(camera.position, target, screen)
 	if not marker["offscreen"]:
-		return
+		return  # on-screen enemies need no arrow
 	var p: Vector2 = marker["position"]
-	var direction: Vector2 = (target - camera.get_screen_center_position()).normalized()
+	var direction: Vector2 = (target - camera.position).normalized()
 	var across := direction.orthogonal()
+	var ink := ENEMY_INK if sim.preset_id != "practice" else TARGET_INK
 	marker_canvas.draw_colored_polygon(PackedVector2Array([p + direction * 14, p - direction * 8 + across * 9,
-		p - direction * 8 - across * 9]), TARGET_INK)
-	var label_pos := p - direction * 45 + Vector2(-32, 5)
-	marker_canvas.draw_string_outline(ThemeDB.fallback_font, label_pos, "TARGET", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 4, Color.BLACK)
-	marker_canvas.draw_string(ThemeDB.fallback_font, label_pos, "TARGET", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, TARGET_INK)
+		p - direction * 8 - across * 9]), ink)
+	var label := "Enemy A"
+	if sim.preset_id == "practice":
+		label = "TARGET"
+	else:
+		label += " · %d" % roundi(target.distance_to(sim.ships[sim.PLAYER_ID]["position"]))
+	var label_pos := p - direction * 45 + Vector2(-40, 5)
+	marker_canvas.draw_string_outline(ThemeDB.fallback_font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 4, Color.BLACK)
+	marker_canvas.draw_string(ThemeDB.fallback_font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ink)
 
 
 func _draw_text(font: Font, p: Vector2, text: String, ink: Color) -> void:
