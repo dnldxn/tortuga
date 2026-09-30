@@ -34,6 +34,7 @@ func run(t) -> bool:
 	_test_pause_discards_edges(t)
 	_test_repeat_cycles(t)
 	_test_reset_ignored_in_selection(t)
+	_test_duel_encounter_wiring(t)
 	main.free()
 	return true
 
@@ -533,4 +534,39 @@ func _test_reset_ignored_in_selection(t) -> void:
 	main.start_practice("sloop")
 	main.advance_tick()
 	t.check(main.sim.events.is_empty() and main.sim.elapsed == DT, "selection presses not deferred into practice")
+	main.return_to_selection()
+
+
+## Plan 03: duels run the AI alongside player commands in the same fixed step.
+func _test_duel_encounter_wiring(t) -> void:
+	main.start_encounter("duel_sloop", "sloop")
+	t.check(main.mode == "sailing" and main.sim.preset_id == "duel_sloop", "start_encounter enters sailing duel")
+	t.check(_ship()["vessel_id"] == "sloop" and main.sim.ships[2]["vessel_id"] == "sloop", "duel spawns both sloops")
+	var enemy_spawn: Vector2 = main.sim.ships[2]["position"]
+	main.advance_tick()
+	t.near(main.sim.elapsed, DT, 1e-9, "duel tick advances one fixed step")
+	t.check(main.sim.ships[2]["position"] != enemy_spawn, "enemy sails under AI alongside player")
+	# Player commands still honored in the merged command dictionary.
+	_send(KEY_D, true)
+	var heading: float = _ship()["heading"]
+	main.advance_tick()
+	t.check(_ship()["heading"] > heading, "player steering honored in duel")
+	_send(KEY_D, false)
+	# Restart keeps the duel (not practice) and resets the AI with the sim.
+	for i in 30:
+		main.advance_tick()
+	main.restart_practice()
+	t.check(main.sim.preset_id == "duel_sloop" and main.sim.elapsed == 0.0
+		and main.sim.ships[2]["position"] == enemy_spawn, "restart returns the same duel to fresh spawn")
+	# A resolved result freezes stepping (guard until plan 03 task 5 wires the menu).
+	main.sim.result = {"outcome": "victory"}
+	main.advance_tick()
+	t.near(main.sim.elapsed, 0.0, 1e-9, "resolved result stops further stepping")
+	main.sim.result = {}
+	# Practice keeps its single-command path: the target never moves.
+	main.start_practice("sloop")
+	var target_spawn: Vector2 = main.sim.ships[2]["position"]
+	for i in 60:
+		main.advance_tick()
+	t.check(main.sim.ships[2]["position"] == target_spawn, "practice target still never moves (no AI)")
 	main.return_to_selection()

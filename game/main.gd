@@ -11,6 +11,7 @@ signal mode_changed(new_mode: String)
 const NavalSimulation := preload("res://sim/naval_simulation.gd")
 const Definitions := preload("res://sim/definitions.gd")
 const Bindings := preload("res://input_bindings.gd")
+const AIController := preload("res://sim/ai_controller.gd")
 const SelectionMenu := preload("res://ui/selection_menu.gd")
 const PauseMenu := preload("res://ui/pause_menu.gd")
 const Hud := preload("res://ui/hud.gd")
@@ -22,6 +23,7 @@ const TURN_ACTIONS := ["turn_left", "turn_right"]
 const EDGE_ACTIONS := ["fire_port", "fire_starboard", "cycle_port", "cycle_starboard"]
 
 var sim = NavalSimulation.new()
+var ai = AIController.new()
 var mode := "selection"
 
 @onready var arena_view: Node2D = $ArenaView
@@ -58,7 +60,7 @@ func _physics_process(_delta: float) -> void:
 
 ## Exactly one fixed step per call, and only while sailing. No accumulator/catch-up.
 func advance_tick() -> void:
-	if mode != "sailing":
+	if mode != "sailing" or not sim.result.is_empty():
 		return
 	if _reset_queued:
 		# This tick is the reset: fire/cycle/toggle queued alongside it are discarded, not
@@ -71,7 +73,14 @@ func advance_tick() -> void:
 		command[action] = _edges.has(action)
 	_toggle_queued = false
 	_edges.clear()
-	sim.step(DT, {NavalSimulation.PLAYER_ID: command})
+	var commands := {NavalSimulation.PLAYER_ID: command}
+	if _is_duel():
+		# AI sees only a copy; its commands join the player's under the opposition IDs.
+		var ai_commands := ai.commands_for_tick(sim.ai_observation(), DT)
+		for id in ai_commands:
+			if id != NavalSimulation.PLAYER_ID:
+				commands[id] = ai_commands[id]
+	sim.step(DT, commands)
 	arena_view.advance_effects()
 	hud.advance_effects()
 	arena_view.consume_events(sim.events)
@@ -79,11 +88,22 @@ func advance_tick() -> void:
 	hud.refresh(sim)
 
 
+## A duel is any non-practice encounter (practice has no AI opponent that acts).
+func _is_duel() -> bool:
+	return mode == "sailing" and sim.preset_id != PRESET and not sim.ships.is_empty()
+
+
 func start_practice(vessel_id: String) -> void:
-	if not Definitions.VESSELS.has(vessel_id):
-		push_error("start_practice: unknown vessel '%s'" % vessel_id)
+	start_encounter(PRESET, vessel_id)
+
+
+## Unified fresh start for every encounter: one AI reset, one signal, clean latches.
+func start_encounter(preset_id: String, vessel_id: String) -> void:
+	if not Definitions.PRESETS.has(preset_id) or not Definitions.VESSELS.has(vessel_id):
+		push_error("start_encounter: unknown preset '%s' or vessel '%s'" % [preset_id, vessel_id])
 		return
-	sim.reset(PRESET, vessel_id)
+	sim.reset(preset_id, vessel_id)
+	ai.reset()
 	hud.reset_effects()
 	arena_view.reset_effects()
 	_enter_mode("sailing")
@@ -92,11 +112,12 @@ func start_practice(vessel_id: String) -> void:
 
 func restart_practice() -> void:
 	if mode != "selection":
-		start_practice(sim.selected_vessel_id)
+		start_encounter(sim.preset_id, sim.selected_vessel_id)
 
 
 func return_to_selection() -> void:
 	sim = NavalSimulation.new()
+	ai = AIController.new()
 	hud.reset_effects()
 	arena_view.reset_effects()
 	_enter_mode("selection")

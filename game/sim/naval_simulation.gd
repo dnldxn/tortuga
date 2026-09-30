@@ -134,6 +134,32 @@ func step(dt: float, commands: Dictionary) -> void:
 	elapsed += dt
 
 
+## Copied, non-aliasing view for the AI: contract fields only, no live nested
+## arrays (loads are reduced to per-side ready counts), no predicted results.
+func ai_observation() -> Dictionary:
+	var observed := {}
+	for id in ships:
+		var ship: Dictionary = ships[id]
+		var entry := {
+			"id": ship["id"], "team": ship["team"], "vessel_id": ship["vessel_id"],
+			"position": ship["position"], "heading": ship["heading"], "speed": ship["speed"],
+			"reefed": ship["reefed"], "hull": ship["hull"], "sails": ship["sails"],
+			"crew": ship["crew"], "active": ship["active"],
+		}
+		if ship["active"]:
+			var sides := {}
+			for side in Definitions.SIDES:
+				var weapon: Dictionary = ship["weapons"][side]
+				sides[side] = {
+					"ammo": weapon["ammo"],
+					"ready": weapon["loads"].filter(func(load): return load == 1.0).size(),
+					"total": weapon["loads"].size(),
+				}
+			entry["sides"] = sides
+		observed[id] = entry
+	return {"ships": observed}
+
+
 ## Read-only aim assist shared by firing and HUD. Nearest active enemy center within the
 ## selected ammo range and ARC_HALF_ANGLE of the broadside; equal distances pick the lower ID.
 ## Otherwise direction is exactly perpendicular and reason explains why.
