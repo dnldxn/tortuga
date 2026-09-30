@@ -8,7 +8,9 @@ The owner requested replacement of the earlier `v0.1` sailing-playground tag/rel
 this plan-02 build. Download `Tortuga-v0.1-macos.zip` from the GitHub `v0.1` release, unzip it,
 and launch `Tortuga.app` on a Mac. The Linux Godot 4.7.2 export completed and its ZIP passed
 `unzip -t`. SHA-256: `3a3313478d79ff4ab3db2a974c712af0ce88a2e8aa4f9976c0e120d258500823`.
-This does **not** constitute a native macOS or rendered test. The original plan-01 archive
+The export check alone did not constitute a native macOS or rendered test; the owner later
+reported that the features were validated on macOS (see the record below). The original
+plan-01 archive
 (SHA-256 `5d69a9c3840b19f21cb5a601b66d924c373602872545a7b971caf7cc2ec8932f`)
 was the one the owner previously tested on macOS; it is not the current download.
 
@@ -30,7 +32,7 @@ After plan 06 changes the test entry point, use `bash game/tests/run_settings_ch
 - [x] Harness failure self-test: **1058 checks, 1 deliberate failure**, exit 1; headless main scene `--quit-after 30`: exit 0.
 - [x] Weapon, projectile, contact, practice reset, controller and view seams reviewed. These checks do not prove native key delivery or rendered clarity.
 
-## Rendered/playable checks — requires a real display
+## Rendered/playable checks — macOS owner report
 
 Launch `"$GODOT" --path game`. Choose **Target practice** and each vessel, first by keyboard, then by mouse. Use the on-screen bindings; the target initially lies due east, outside both broadsides. Turn to acquire it, fire, and inspect projectile travel, muzzle/hit/splash cues, target condition and gun reload progress. Fire a partial volley, compare the other side, cycle one side, and try firing with no loaded guns and firing without aim assist. Reset while shots travel; verify there are no ghost impacts.
 
@@ -42,8 +44,13 @@ For every vessel, sink the brig using Round (hull), disable sails using Chain an
 - [ ] Pause freezes effects; offscreen marker points toward target: ____
 - [ ] Both resolutions: readable without hiding the gameplay center: ____
 
+**Owner report, 2026-09-30:** The features were validated on macOS. This confirms a native
+real-display run of the plan-02 build; the owner did not provide per-scenario observations,
+resolution, machine details, or a breakdown of the checks above, so those fields remain open.
+
 | Build / Godot version | Vessel / ammo | Resolution | Tester / machine | Observed result / failures |
 |---|---|---|---|---|
+| v0.1 plan-02 macOS archive / Godot 4.7.2 | Not specified | Not specified | Project owner / Mac (details not specified) | Features validated on macOS; individual observations not supplied |
 | Pending | Pending | 1280×720 | Pending | Pending |
 | Pending | Pending | 1920×1080 | Pending | Pending |
 
