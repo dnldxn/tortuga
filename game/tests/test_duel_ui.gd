@@ -75,15 +75,20 @@ func _test_enemy_hud_block(t) -> void:
 	var hud = main.hud
 	var text := _all_text(hud)
 	t.check("Enemy A (Brig)" in text, "enemy block names Enemy A with vessel")
-	t.check("Hull 160/160" in text and "Sails 100/100" in text and "Crew 90/90" in text, "enemy block shows condition current/max")
-	t.check("Distance" in text and "Active" in text, "enemy block shows distance and Active")
-	t.check("Sink the enemy" in text, "duel guidance replaces practice guidance")
+	var stats: Dictionary = hud.target_stats
+	t.check(stats["hull"][1].text == "160/160" and stats["sails"][1].text == "100/100" and stats["crew"][1].text == "90/90",
+		"enemy block shows condition current/max")
+	var distance := roundi(main.sim.ships[2]["position"].distance_to(main.sim.ships[1]["position"]))
+	t.check(hud.target_state_label.text == "%d · Active" % distance, "enemy block shows distance and Active")
+	main.set_paused(true)
+	t.check("Sink the enemy" in _all_text(main.pause_menu), "duel guidance replaces practice guidance")
+	main.set_paused(false)
 	# Damage updates the final values.
 	main.sim.ships[2]["hull"] = 80.0
 	main.sim.ships[2]["sails"] = 50.0
 	hud.refresh(main.sim)
-	text = _all_text(hud)
-	t.check("Hull 80/160" in text and "Sails 50/100" in text, "enemy condition follows sim damage")
+	t.check(stats["hull"][1].text == "80/160" and stats["sails"][1].text == "50/100"
+		and stats["hull"][0].value == 80.0 and stats["hull"][0].max_value == 160.0, "enemy condition follows sim damage")
 	main.sim.ships[2]["active"] = false
 	main.sim.ships[2]["defeat_reasons"] = ["sails"]
 	hud.refresh(main.sim)

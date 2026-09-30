@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- Sails: mast with a billowing square sail. Original work for Tortuga, 2026-09-30. -->
+  <path d="M12 2 V22" stroke="#1a1208" stroke-width="3"/>
+  <path d="M12 2 V22" stroke="#f2e6cf" stroke-width="1.2"/>
+  <path d="M4 5 H20 Q22 11 20 17 H4 Q6 11 4 5 Z" fill="#f2e6cf" stroke="#1a1208" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>

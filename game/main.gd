@@ -178,6 +178,7 @@ func _enter_mode(new_mode: String) -> void:
 		"selection":
 			selection.show_mode_select()
 		"paused":
+			pause_menu.show_help(sim)
 			pause_menu.resume_button.grab_focus()
 		"sailing":
 			get_viewport().gui_release_focus()
@@ -207,6 +208,14 @@ func _make_theme() -> Theme:
 	var panel := StyleBoxFlat.new()
 	panel.bg_color = Color(0.04, 0.07, 0.12, 0.82)
 	panel.set_corner_radius_all(6)
-	panel.set_content_margin_all(12)
+	panel.set_content_margin_all(10)
 	theme.set_stylebox("panel", "PanelContainer", panel)
+	var bar_bg := StyleBoxFlat.new()
+	bar_bg.bg_color = Color(0, 0, 0, 0.6)
+	bar_bg.set_corner_radius_all(2)
+	theme.set_stylebox("background", "ProgressBar", bar_bg)
+	var bar_fill := StyleBoxFlat.new()
+	bar_fill.bg_color = Color(0.95, 0.82, 0.45)
+	bar_fill.set_corner_radius_all(2)
+	theme.set_stylebox("fill", "ProgressBar", bar_fill)
 	return theme

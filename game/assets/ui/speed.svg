@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- Speed: forward chevrons. Original work for Tortuga, 2026-09-30. -->
+  <path d="M3 5 L10 12 L3 19 V14.5 L5.5 12 L3 9.5 Z M11 5 L18 12 L11 19 V14.5 L13.5 12 L11 9.5 Z" fill="#f2e6cf" stroke="#1a1208" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M19 6 V18" stroke="#1a1208" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M19 6 V18" stroke="#f2e6cf" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

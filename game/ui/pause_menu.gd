@@ -1,15 +1,23 @@
 extends Control
-## Pause overlay: Resume / Restart practice / Return to selection.
+## Pause overlay: Resume / Restart practice / Return to selection, plus the sailing help
+## (guidance, ammo tracks, live key bindings) kept off the in-play HUD.
 
 signal resume_requested
 signal restart_requested
 signal return_requested
 
 const SelectionMenu := preload("res://ui/selection_menu.gd")
+const Bindings := preload("res://input_bindings.gd")
+
+const GUIDANCE := "Full sails: faster · Reefed: tighter turns · Into the wind is slow, but you can still turn."
+const DUEL_GUIDANCE := "Sink the enemy, or exhaust its sails or crew. Turn a broadside toward it to fire."
+const AMMO_HELP := "Round: hull / Chain: sails / Grape: crew · Changing ammo restarts that side's reload."
 
 var resume_button: Button
 var restart_button: Button
 var return_button: Button
+var guidance_label: Label
+var bindings_label: Label
 
 
 func _ready() -> void:
@@ -31,9 +39,40 @@ func _ready() -> void:
 	restart_button = _button(box, "Restart practice", restart_requested)
 	return_button = _button(box, "Return to selection", return_requested)
 	panel.add_child(box)
-	center.add_child(panel)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 16)
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
+	var menu_row := CenterContainer.new()
+	menu_row.add_child(panel)
+	column.add_child(menu_row)
+	var help := VBoxContainer.new()
+	guidance_label = _help_label(help)
+	_help_label(help).text = AMMO_HELP
+	bindings_label = _help_label(help)
+	var help_panel := PanelContainer.new()
+	help_panel.add_child(help)
+	column.add_child(help_panel)
+	center.add_child(column)
 	add_child(center)
 	SelectionMenu.link_focus([resume_button, restart_button, return_button])
+
+
+## Refreshed on every pause so guidance matches the encounter and bindings are live.
+func show_help(sim) -> void:
+	guidance_label.text = DUEL_GUIDANCE if sim.preset_id != "practice" else GUIDANCE
+	bindings_label.text = "%s/%s steer · %s sails · %s pause · %s reset\n%s fire Port · %s fire Starboard · %s cycle Port · %s cycle Starboard" % [
+		Bindings.binding_label("turn_left"), Bindings.binding_label("turn_right"),
+		Bindings.binding_label("toggle_sails"), Bindings.binding_label("pause"),
+		Bindings.binding_label("reset_practice"),
+		Bindings.binding_label("fire_port"), Bindings.binding_label("fire_starboard"),
+		Bindings.binding_label("cycle_port"), Bindings.binding_label("cycle_starboard")]
+
+
+func _help_label(parent: Node) -> Label:
+	var label := Label.new()
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	parent.add_child(label)
+	return label
 
 
 func _button(parent: Node, text: String, request: Signal) -> Button:

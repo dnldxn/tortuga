@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- Hull: side-on boat hull. Original work for Tortuga, 2026-09-30. -->
+  <path d="M2 11 H22 L19 19 Q18 20 17 20 H7 Q6 20 5 19 Z" fill="#f2e6cf" stroke="#1a1208" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M5 14.5 H19" stroke="#1a1208" stroke-width="1.2"/>
+  <path d="M12 4 V11" stroke="#1a1208" stroke-width="3"/>
+  <path d="M12 4 V11" stroke="#f2e6cf" stroke-width="1.2"/>
+</svg>

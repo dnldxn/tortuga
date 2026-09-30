@@ -309,26 +309,48 @@ func _test_hud(t) -> void:
 	t.check(_snapshot() == snap, "HUD refresh does not mutate sim")
 	var text := _all_text(hud)
 	t.check(vessel["display_name"] in text, "HUD shows vessel name")
-	t.check("Hull 100/100" in text and "Sails 70/70" in text and "Crew 60/60" in text, "HUD shows condition current/max")
+	var stats: Dictionary = hud.ship_stats
+	t.check(stats["hull"][1].text == "100/100" and stats["sails"][1].text == "70/70" and stats["crew"][1].text == "60/60"
+		and stats["hull"][0].value == 100.0 and stats["hull"][0].max_value == 100.0,
+		"HUD shows condition bars and current/max")
+	for icon in hud.find_children("*", "TextureRect", true, false):
+		t.check(icon.texture != null, "HUD icon has a texture")
+	t.check(hud.find_children("*", "TextureRect", true, false).size() >= 10, "HUD labels carry icons")
 	t.check("FULL SAILS" in text, "HUD shows full sails")
-	t.check("Sailing speed" in text, "HUD shows speed label")
-	t.check("Wind travels" in text and "east" in text, "HUD shows wind direction text")
-	t.check(GUIDANCE in text and BANNER in text, "HUD guidance and banner exact")
+	t.check("Wind E" in text, "HUD shows wind direction text")
+	t.check(BANNER in text, "HUD target banner exact")
+	t.check(GUIDANCE not in text and "steer" not in text, "help text is not on the in-play HUD")
+	main.set_paused(true)
+	var help := _all_text(main.pause_menu)
 	var binds := "%s/%s steer · %s sails · %s pause" % [Bindings.binding_label("turn_left"),
 		Bindings.binding_label("turn_right"), Bindings.binding_label("toggle_sails"), Bindings.binding_label("pause")]
-	t.check(binds in text, "HUD bindings built from binding_label")
+	t.check(GUIDANCE in help and binds in help, "pause menu shows guidance and bindings from binding_label")
+	var pause_size: Vector2 = main.pause_menu.get_child(1).get_combined_minimum_size()
+	t.check(pause_size.x <= 1280 and pause_size.y <= 720, "pause menu with help fits 1280x720 (%s)" % pause_size)
+	main.set_paused(false)
 	var arrow: Control = hud.find_child("WindArrow", true, false)
-	t.check(arrow != null and arrow.custom_minimum_size.x >= 48, "WindArrow placeholder present")
+	t.check(arrow != null and arrow.custom_minimum_size.x >= 32, "WindArrow placeholder present")
 	main.advance_tick()
-	t.check(("Sailing speed %d" % roundi(_ship()["speed"])) in _all_text(hud), "HUD speed follows sim each tick")
+	t.check(hud.speed_label.text == "%d" % roundi(_ship()["speed"]), "HUD speed follows sim each tick")
 	_tap(KEY_W)
 	main.advance_tick()
 	t.check("REEFED" in _all_text(hud), "HUD shows reefed")
-	for control in [hud.bindings_label, main.selection.sailing_button, main.pause_menu.resume_button]:
+	for control in [hud.name_label, hud.side_labels["port"], main.pause_menu.bindings_label,
+			main.selection.sailing_button, main.pause_menu.resume_button]:
 		t.check(control.get_theme_font_size("font_size") >= 18, "font size >= 18 for %s" % control.name)
-	var content: MarginContainer = hud.get_child(0)
-	t.check(content.get_combined_minimum_size().x <= 1280,
-		"HUD panels and control legend intrinsic width fit 1280px viewport")
+	# Frigate has the widest broadside panels; corners must stay compact and off the centre.
+	main.start_practice("frigate")
+	var view := Rect2(0, 0, 1280, 720)
+	var centre := Rect2(320, 180, 640, 360)
+	var area := 0.0
+	for panel in hud.panels:
+		var sz: Vector2 = panel.get_combined_minimum_size()
+		var anchor := Vector2(0.0 if panel.anchor_left == 0.0 else 1.0, 0.0 if panel.anchor_top == 0.0 else 1.0)
+		var rect := Rect2(view.size * anchor + Vector2(12, 12) * (Vector2.ONE - anchor * 2.0) - sz * anchor, sz)
+		area += sz.x * sz.y
+		t.check(view.encloses(rect) and not rect.intersects(centre),
+			"HUD corner %s (%s) stays on screen and off the centre" % [panel.get_index(), sz])
+	t.check(area <= 0.2 * view.get_area(), "HUD panels cover <= 20%% of 1280x720 (%.1f%%)" % (100.0 * area / view.get_area()))
 
 
 func _all_text(node: Node) -> String:
@@ -346,23 +368,30 @@ func _test_weapon_hud(t) -> void:
 	var text := _all_text(hud)
 	t.check("Port · Round · 4/4 ready" in text and "Starboard · Round · 4/4 ready" in text,
 		"HUD shows independently loaded broadsides")
-	t.check(hud.side_labels["port"].get_parent().get_parent() != hud.name_label.get_parent().get_parent()
-		and hud.side_labels["starboard"].get_parent().get_parent() != hud.target_label.get_parent().get_parent(),
+	var panel_of := func(label: Node) -> Node: return label.get_parent().get_parent().get_parent()
+	t.check(panel_of.call(hud.side_labels["port"]) != hud.name_label.get_parent().get_parent()
+		and panel_of.call(hud.side_labels["starboard"]) != hud.target_label.get_parent().get_parent()
+		and panel_of.call(hud.side_labels["port"]) != panel_of.call(hud.side_labels["starboard"]),
 		"each broadside occupies its own panel apart from ship conditions")
 	t.check("outside arc" in text and "900" in text, "initial target is outside arc; range still shown")
-	t.check("Round: hull / Chain: sails / Grape: crew" in text and "restarts that side" in text,
-		"ammo tracks and cycle reload cost explained")
+	var visible_bars := func(side: String) -> Array:
+		return hud.gun_bars[side].filter(func(bar): return bar.visible).map(func(bar): return bar.value)
+	t.check(visible_bars.call("port") == [100.0, 100.0, 100.0, 100.0], "sloop shows four loaded port gun bars")
+	main.set_paused(true)
+	t.check("Round: hull / Chain: sails / Grape: crew" in _all_text(main.pause_menu)
+		and "restarts that side" in _all_text(main.pause_menu), "ammo tracks and cycle reload cost explained on pause")
+	main.set_paused(false)
 	main.sim.ships[1]["weapons"]["port"]["ammo"] = "grape"
 	main.sim.ships[1]["weapons"]["port"]["loads"] = [1.0, 0.5, 0.0, 0.25]
 	hud.refresh(main.sim)
-	t.check("Port · Grape · 1/4 ready" in _all_text(hud) and "2:50%" in _all_text(hud)
+	t.check("Port · Grape · 1/4 ready" in _all_text(hud) and visible_bars.call("port")[1] == 50.0
 		and "Starboard · Round · 4/4 ready" in _all_text(hud) and "Range 300" in _all_text(hud),
 		"one side changes ammo/range/progress without affecting opposite broadside")
 	main.sim.ships[1]["weapons"]["port"]["loads"] = [0.999, 0.0, 0.0, 0.0]
 	hud.refresh(main.sim)
 	t.check("Port · Grape · 0/4 ready" in hud.side_labels["port"].text
-		and "1:99%" in hud.side_labels["port"].text
-		and "1:100%" in hud.side_labels["starboard"].text,
+		and visible_bars.call("port")[0] == 99.0
+		and visible_bars.call("starboard")[0] == 100.0,
 		"near-ready gun displays below 100%; fully loaded opposite side shows 100%")
 	# Leave enough headroom that this tick's reload cannot complete the gun before fire.
 	main.sim.ships[1]["weapons"]["port"]["loads"][0] = 0.99
@@ -374,9 +403,10 @@ func _test_weapon_hud(t) -> void:
 	for action in ["fire_port", "fire_starboard", "cycle_port", "cycle_starboard", "reset_practice"]:
 		InputMap.action_erase_events(action)
 		InputMap.action_add_event(action, _key(KEY_J, false))
-	hud.refresh(main.sim)
-	t.check("J fire" in _all_text(hud) and "J cycle" in _all_text(hud)
-		and "J reset" in _all_text(hud), "weapon prompts use live bindings")
+	main.set_paused(true)
+	var help := _all_text(main.pause_menu)
+	t.check("J fire" in help and "J cycle" in help and "J reset" in help, "weapon prompts use live bindings")
+	main.set_paused(false)
 	for action in ["fire_port", "fire_starboard", "cycle_port", "cycle_starboard", "reset_practice"]:
 		InputMap.action_erase_events(action)
 	Bindings.install_defaults()
