@@ -106,6 +106,9 @@ func reset(new_preset_id: String, vessel_id: String) -> void:
 ## then damage applied and defeat classified. Every ship active at step start may act
 ## before any damage lands.
 func step(dt: float, commands: Dictionary) -> void:
+	if not result.is_empty():
+		events.clear()  # terminal no-op: effects cannot repeat, result and final state stay
+		return
 	events.clear()
 	var acting := []
 	for id in ships:
@@ -132,6 +135,43 @@ func step(dt: float, commands: Dictionary) -> void:
 				_fire(ships[id], side)
 	_apply_damage(_advance_projectiles(dt, acting))
 	elapsed += dt
+	_resolve_combat_result()
+
+
+## Duel outcome after 02's damage/defeat pass. Practice and already-resolved matches
+## stay empty; the player's team is counted, never a hardcoded enemy ID. Plan 04's
+## escape resolution joins here.
+func _resolve_combat_result() -> void:
+	if preset_id == "practice" or not result.is_empty():
+		return
+	var player_active := false
+	var opposition_active := 0
+	var defeated := []
+	var ids: Array = ships.keys()
+	ids.sort()
+	for id in ids:
+		var ship: Dictionary = ships[id]
+		if ship["team"] == TEAM_PLAYER:
+			player_active = player_active or ship["active"]
+		else:
+			opposition_active += 1 if ship["active"] else 0
+		if not ship["active"]:
+			var reasons: Array = ship["defeat_reasons"]
+			defeated.append({
+				"ship_id": id,
+				"reason": "sunk" if "sunk" in reasons else "disabled",
+				"disabled_by": reasons.filter(func(r): return r != "sunk"),
+			})
+	var outcome := ""
+	if player_active and opposition_active == 0:
+		outcome = "victory"
+	elif not player_active and opposition_active > 0:
+		outcome = "defeat"
+	elif not player_active and opposition_active == 0:
+		outcome = "draw"
+	if outcome == "":
+		return
+	result = {"outcome": outcome, "elapsed": elapsed, "defeated": defeated}
 
 
 ## Copied, non-aliasing view for the AI: contract fields only, no live nested

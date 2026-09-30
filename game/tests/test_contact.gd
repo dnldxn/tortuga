@@ -202,13 +202,15 @@ func _test_through_step(t) -> void:
 	var c := _ship(3, "brig", Vector2(3020, 2000), false)
 	for reverse in [false, true]:
 		var sim = _sim_with([a, b, c], reverse)
+		sim.result = {}  # plan 03: a resolved result freezes stepping; test the live path
 		sim.step(DT, {})
 		t.near(sim.ships[1]["speed"], 144.0, 1e-4, "step: contact keeps requested downwind speed (reverse=%s)" % reverse)
 		t.near(sim.ships[2]["speed"], 21.6, 1e-4, "step: contact keeps requested upwind speed (reverse=%s)" % reverse)
 		t.check(sim.ships[1]["heading"] == 0.0 and absf(sim.ships[2]["heading"]) == PI, "step: contact keeps headings (reverse=%s)" % reverse)
 		t.check(_worst_penetration(_active(sim)) <= TOL, "step: resolved contact (reverse=%s)" % reverse)
-		t.check(sim.ships[3] == c and sim.result == {"marker": 1}, "step: inactive/result untouched (reverse=%s)" % reverse)
+		t.check(sim.ships[3] == c, "step: inactive ships untouched (reverse=%s)" % reverse)
 	var out = _sim_with([_ship(1, "sloop", _edge("sloop", Vector2.RIGHT))])
+	out.result = {}  # plan 03: a resolved result freezes stepping; test the live path
 	out.step(DT, {})
 	t.check(out.ships[1]["position"] == _edge("sloop", Vector2.RIGHT), "step: ship sailing into wall stays on safe bound")
 	t.near(out.ships[1]["speed"], 144.0, 1e-4, "step: wall-blocked ship keeps requested speed")
@@ -225,6 +227,7 @@ func _recover(vessel_id: String, blocker_offset: Vector2):
 		blocker["sails"] = 0.0  # stationary obstacle
 		list.append(blocker)
 	var sim = _sim_with(list)
+	sim.result = {}  # plan 03: a resolved result freezes stepping; test the live path
 	var ok := true
 	for i in 600:
 		sim.step(DT, {1: {"turn": 1.0 if i < 180 else 0.0}})

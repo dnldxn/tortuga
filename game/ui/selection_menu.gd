@@ -1,12 +1,22 @@
 extends Control
-## Mode select (Target practice / Quit) -> vessel select (vessels / Start / Back).
+## Mode select (practice / three duels / Quit) -> vessel select (vessels / Start / Back).
+## start_requested carries the chosen preset id and vessel id.
 
-signal start_requested(vessel_id: String)
+signal start_requested(preset_id: String, vessel_id: String)
 signal quit_requested
 
 const Definitions := preload("res://sim/definitions.gd")
 
+const MODES := [
+	["practice", "Target practice"],
+	["duel_sloop", "Sloop duel"],
+	["duel_brig", "Brig duel"],
+	["duel_frigate", "Frigate duel"],
+]
+const GUIDANCE := "Sink the enemy, or exhaust its sails or crew. Turn a broadside toward it to fire."
+
 var sailing_button: Button
+var duel_buttons := {}  # preset id -> Button
 var quit_button: Button
 var start_button: Button
 var back_button: Button
@@ -14,6 +24,7 @@ var vessel_buttons := {}  # vessel_id -> toggle Button
 
 var _mode_screen: Control
 var _vessel_screen: Control
+var _chosen_preset := "practice"
 
 
 func _ready() -> void:
@@ -21,14 +32,26 @@ func _ready() -> void:
 	var title := Label.new()
 	title.text = "Tortuga"
 	title.add_theme_font_size_override("font_size", 48)
+	var column := [title]
 	sailing_button = _button("Target practice")
+	column.append(sailing_button)
+	duel_buttons["duel_sloop"] = _button("Sloop duel")
+	duel_buttons["duel_brig"] = _button("Brig duel")
+	duel_buttons["duel_frigate"] = _button("Frigate duel")
+	column.append_array([duel_buttons["duel_sloop"], duel_buttons["duel_brig"], duel_buttons["duel_frigate"]])
+	var guidance := Label.new()
+	guidance.text = GUIDANCE
+	guidance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	guidance.custom_minimum_size = Vector2(420, 0)
+	column.append(guidance)
 	quit_button = _button("Quit")
-	_mode_screen = _screen([title, sailing_button, quit_button])
+	column.append(quit_button)
+	_mode_screen = _screen(column)
 
 	var heading := Label.new()
 	heading.text = "Choose your vessel"
 	var group := ButtonGroup.new()
-	var column := [heading]
+	var vessel_column := [heading]
 	for id in Definitions.VESSELS:
 		var vessel: Dictionary = Definitions.VESSELS[id]
 		var button := _button("%s — %s" % [vessel["display_name"], vessel["description"]])
@@ -36,19 +59,21 @@ func _ready() -> void:
 		button.button_group = group
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		vessel_buttons[id] = button
-		column.append(button)
+		vessel_column.append(button)
 	vessel_buttons["sloop"].button_pressed = true
 	start_button = _button("Start")
 	back_button = _button("Back")
-	column.append_array([start_button, back_button])
-	_vessel_screen = _screen(column)
+	vessel_column.append_array([start_button, back_button])
+	_vessel_screen = _screen(vessel_column)
 
-	link_focus([sailing_button, quit_button])
+	link_focus([sailing_button, quit_button] + duel_buttons.values())
 	link_focus(vessel_buttons.values() + [start_button, back_button])
-	sailing_button.pressed.connect(_show_vessels)
+	sailing_button.pressed.connect(_show_vessels.bind("practice"))
+	for preset_id in duel_buttons:
+		duel_buttons[preset_id].pressed.connect(_show_vessels.bind(preset_id))
 	quit_button.pressed.connect(quit_requested.emit)
 	back_button.pressed.connect(show_mode_select)
-	start_button.pressed.connect(func(): start_requested.emit(selected_vessel_id()))
+	start_button.pressed.connect(func(): start_requested.emit(_chosen_preset, selected_vessel_id()))
 
 
 func show_mode_select() -> void:
@@ -64,7 +89,8 @@ func selected_vessel_id() -> String:
 	return "sloop"
 
 
-func _show_vessels() -> void:
+func _show_vessels(preset_id: String) -> void:
+	_chosen_preset = preset_id
 	_mode_screen.hide()
 	_vessel_screen.show()
 	vessel_buttons[selected_vessel_id()].grab_focus()

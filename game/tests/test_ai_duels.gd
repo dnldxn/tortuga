@@ -49,6 +49,7 @@ func run(t) -> bool:
 	_test_overlap_recovery(t)
 	_test_boundary_recovery(t)
 	_test_recovery_details(t)
+	_test_combat_results(t)
 	return true
 
 
@@ -559,3 +560,105 @@ func _test_recovery_details(t) -> void:
 	t.check(recovering, "memory tracked the recovery encounter")
 	ai.reset()
 	t.check(not ai._memory.has(2), "reset clears recovery memory")
+
+
+## Real-projectile outcome fixtures: victory/defeat tracks, same-step draw, freeze.
+func _test_combat_results(t) -> void:
+	_test_result_victory_defeat(t)
+	_test_result_draw(t)
+	_test_result_freeze_and_practice(t)
+
+
+func _result_sim(preset_id: String, player_hull := 240.0, enemy_hull := 240.0):
+	var sim = NavalSimulation.new()
+	sim.reset(preset_id, "frigate")
+	sim.ships[1]["hull"] = player_hull
+	sim.ships[2]["hull"] = enemy_hull
+	return sim
+
+
+## A lethal shot placed inside the victim's circle resolves on the next step.
+func _lethal_shot(sim, owner_id: int, victim_id: int) -> void:
+	var at: Vector2 = sim.ships[victim_id]["position"] - Vector2(0, 10)
+	sim.projectiles.append({"id": sim.next_projectile_id, "owner_id": owner_id, "ammo": "round",
+		"position": at, "direction": Vector2.DOWN, "remaining_range": 900.0, "owner_cleared": true})
+	sim.next_projectile_id += 1
+
+
+func _test_result_victory_defeat(t) -> void:
+	var sunk = _result_sim("duel_frigate", 240.0, 3.0)
+	_lethal_shot(sunk, 1, 2)
+	sunk.step(DT, {})
+	t.check(sunk.result["outcome"] == "victory", "enemy sunk resolves victory")
+	t.check(sunk.result["defeated"] == [{"ship_id": 2, "reason": "sunk", "disabled_by": []}],
+		"victory defeated list: ship 2 sunk, no disabled reasons")
+	t.near(sunk.result["elapsed"], DT, 1e-9, "result records elapsed seconds")
+	var lost = _result_sim("duel_frigate", 3.0, 240.0)
+	_lethal_shot(lost, 2, 1)
+	lost.step(DT, {})
+	t.check(lost.result["outcome"] == "defeat", "player sunk resolves defeat")
+	t.check(lost.result["defeated"][0]["ship_id"] == 1, "defeat names the player ship")
+	# Sails+crew zero: disabled with both reasons, sorted sails then crew.
+	var disabled = _result_sim("duel_frigate", 240.0, 240.0)
+	disabled.ships[2]["sails"] = 3.0
+	disabled.ships[2]["crew"] = 3.0
+	for ammo in ["chain", "grape"]:
+		var at: Vector2 = disabled.ships[2]["position"] - Vector2(0, 10)
+		disabled.projectiles.append({"id": disabled.next_projectile_id, "owner_id": 1, "ammo": ammo,
+			"position": at, "direction": Vector2.DOWN, "remaining_range": 600.0, "owner_cleared": true})
+		disabled.next_projectile_id += 1
+	disabled.step(DT, {})
+	t.check(disabled.result["outcome"] == "victory" and disabled.ships[2]["defeat_reasons"] == ["sails", "crew"],
+		"disabled enemy lists sails and crew reasons in order")
+	t.check(disabled.result["defeated"][0]["reason"] == "disabled"
+		and disabled.result["defeated"][0]["disabled_by"] == ["sails", "crew"], "disabled_by copies the reasons")
+	# Hull and sails both zero: sunk.
+	var sunk_over = _result_sim("duel_frigate", 240.0, 240.0)
+	sunk_over.ships[2]["hull"] = 3.0
+	sunk_over.ships[2]["sails"] = 0.0
+	_lethal_shot(sunk_over, 1, 2)
+	sunk_over.step(DT, {})
+	t.check(sunk_over.result["defeated"][0]["reason"] == "sunk"
+		and sunk_over.result["defeated"][0]["disabled_by"] == [], "hull+sails zero is sunk with empty reasons")
+
+
+## Two real shots crossing within one step: draw regardless of projectile order.
+func _test_result_draw(t) -> void:
+	for swap in [false, true]:
+		var sim = _result_sim("duel_sloop", 8.0, 8.0)
+		sim.ships[1]["vessel_id"] = "sloop"
+		var shots := [
+			[1, 2, sim.ships[2]["position"] - Vector2(0, 0.5)],
+			[2, 1, sim.ships[1]["position"] - Vector2(0, 0.5)],
+		]
+		if swap:
+			shots.reverse()
+		for s in shots:
+			sim.projectiles.append({"id": sim.next_projectile_id, "owner_id": s[0], "ammo": "round",
+				"position": s[2], "direction": Vector2.DOWN, "remaining_range": 900.0, "owner_cleared": true})
+			sim.next_projectile_id += 1
+		sim.step(DT, {})
+		t.check(sim.result["outcome"] == "draw", "same-step mutual sinking is a draw (swap=%s)" % swap)
+		t.check(sim.result["defeated"].map(func(d): return d["ship_id"]) == [1, 2],
+			"draw lists both ships in ID order (swap=%s)" % swap)
+
+
+## A resolved match freezes later steps; practice never produces results.
+func _test_result_freeze_and_practice(t) -> void:
+	var sim = _result_sim("duel_frigate", 240.0, 3.0)
+	_lethal_shot(sim, 1, 2)
+	sim.step(DT, {})
+	var frozen: Vector2 = sim.ships[1]["position"]
+	var result_snapshot: Dictionary = sim.result.duplicate(true)
+	for i in 30:
+		sim.step(DT, {1: {"turn": 1.0}, 2: {"turn": 1.0}})
+	t.check(sim.ships[1]["position"] == frozen and sim.result == result_snapshot,
+		"resolved match freezes ships and result")
+	t.check(sim.result["outcome"] == "victory", "earlier defeat cannot later become a draw")
+	var practice = NavalSimulation.new()
+	practice.reset("practice", "sloop")
+	practice.ships[2]["hull"] = 3.0
+	_lethal_shot(practice, 1, 2)
+	practice.step(DT, {})
+	t.check(not practice.ships[2]["active"] and practice.result.is_empty(),
+		"practice target defeat leaves the result empty")

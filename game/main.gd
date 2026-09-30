@@ -1,6 +1,6 @@
 extends Node
-## Mode controller: selection / sailing / paused. Owns the simulation and gates it;
-## the SceneTree itself is never paused so menus keep running.
+## Mode controller: selection / sailing / paused / result. Owns the simulation and gates
+## it; the SceneTree itself is never paused so menus keep running.
 ## Presentation (HUD and $ArenaView) reads `sim` without mutating it.
 
 ## Emitted after sim.reset() (start or restart): views must resync from `sim`.
@@ -14,6 +14,7 @@ const Bindings := preload("res://input_bindings.gd")
 const AIController := preload("res://sim/ai_controller.gd")
 const SelectionMenu := preload("res://ui/selection_menu.gd")
 const PauseMenu := preload("res://ui/pause_menu.gd")
+const ResultMenu := preload("res://ui/result_menu.gd")
 const Hud := preload("res://ui/hud.gd")
 
 const DT := 1.0 / 60.0
@@ -30,6 +31,7 @@ var mode := "selection"
 var selection: Control
 var hud: Control
 var pause_menu: Control
+var result_menu: Control
 
 var _held := {}  # turn actions freshly pressed while sailing and not yet released
 var _toggle_queued := false  # parity of non-echo toggle presses since the last tick
@@ -42,15 +44,18 @@ func _ready() -> void:
 	var theme := _make_theme()
 	hud = Hud.new()
 	pause_menu = PauseMenu.new()
+	result_menu = ResultMenu.new()
 	selection = SelectionMenu.new()
-	for control in [hud, pause_menu, selection]:
+	for control in [hud, pause_menu, result_menu, selection]:
 		control.theme = theme
 		$UI.add_child(control)
-	selection.start_requested.connect(start_practice)
+	selection.start_requested.connect(start_encounter)
 	selection.quit_requested.connect(get_tree().quit)
 	pause_menu.resume_requested.connect(set_paused.bind(false))
 	pause_menu.restart_requested.connect(restart_practice)
 	pause_menu.return_requested.connect(return_to_selection)
+	result_menu.replay_requested.connect(restart_practice)
+	result_menu.return_requested.connect(return_to_selection)
 	_enter_mode("selection")
 
 
@@ -81,6 +86,8 @@ func advance_tick() -> void:
 			if id != NavalSimulation.PLAYER_ID:
 				commands[id] = ai_commands[id]
 	sim.step(DT, commands)
+	if not sim.result.is_empty():
+		_enter_mode("result")
 	arena_view.advance_effects()
 	hud.advance_effects()
 	arena_view.consume_events(sim.events)
@@ -149,7 +156,7 @@ func _input(event: InputEvent) -> void:
 				_edges[action] = true
 		if event.is_action_pressed("reset_practice"):
 			_reset_queued = true
-	if event.is_action_pressed("pause") and mode != "selection":
+	if event.is_action_pressed("pause") and mode in ["sailing", "paused"]:
 		set_paused(mode == "sailing")
 		get_viewport().set_input_as_handled()
 
@@ -166,6 +173,7 @@ func _enter_mode(new_mode: String) -> void:
 	selection.visible = mode == "selection"
 	hud.visible = mode != "selection"
 	pause_menu.visible = mode == "paused"
+	result_menu.visible = mode == "result"
 	match mode:
 		"selection":
 			selection.show_mode_select()
@@ -173,6 +181,8 @@ func _enter_mode(new_mode: String) -> void:
 			pause_menu.resume_button.grab_focus()
 		"sailing":
 			get_viewport().gui_release_focus()
+		"result":
+			result_menu.show_result(sim)
 	if mode != "selection":
 		hud.refresh(sim)
 	mode_changed.emit(mode)

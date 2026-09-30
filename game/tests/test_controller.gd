@@ -35,6 +35,7 @@ func run(t) -> bool:
 	_test_repeat_cycles(t)
 	_test_reset_ignored_in_selection(t)
 	_test_duel_encounter_wiring(t)
+	_test_duel_selection_and_result(t)
 	main.free()
 	return true
 
@@ -569,4 +570,67 @@ func _test_duel_encounter_wiring(t) -> void:
 	for i in 60:
 		main.advance_tick()
 	t.check(main.sim.ships[2]["position"] == target_spawn, "practice target still never moves (no AI)")
+	main.return_to_selection()
+
+
+## Plan 03 task 5: duel menu entries, result overlay, replay and return flows.
+func _test_duel_selection_and_result(t) -> void:
+	main.return_to_selection()
+	var sel = main.selection
+	t.check(sel.duel_buttons["duel_sloop"].text == "Sloop duel"
+		and sel.duel_buttons["duel_brig"].text == "Brig duel"
+		and sel.duel_buttons["duel_frigate"].text == "Frigate duel", "selection offers the three duel labels")
+	t.check("Sink the enemy" in _all_text(sel), "selection shows duel guidance")
+	# Start a brig duel by keyboard-style button activation.
+	sel.duel_buttons["duel_brig"].pressed.emit()
+	sel.vessel_buttons["frigate"].button_pressed = true
+	sel.start_button.pressed.emit()
+	t.check(main.mode == "sailing" and main.sim.preset_id == "duel_brig"
+		and main.sim.selected_vessel_id == "frigate", "duel started with chosen preset and vessel")
+	# Resolve a victory via a lethal shot on the next tick.
+	main.sim.ships[2]["hull"] = 3.0
+	main.sim.projectiles.append({"id": main.sim.next_projectile_id, "owner_id": 1, "ammo": "round",
+		"position": main.sim.ships[2]["position"] - Vector2(0, 10), "direction": Vector2.DOWN,
+		"remaining_range": 900.0, "owner_cleared": true})
+	main.sim.next_projectile_id += 1
+	var shown := [0]
+	main.mode_changed.connect(func(_m): shown[0] += 1)
+	main.advance_tick()
+	t.check(main.mode == "result" and main.result_menu.visible, "resolved duel enters result mode")
+	t.check(main.result_menu.replay_button.has_focus(), "Replay button focused initially")
+	t.check("Victory" in _all_text(main.result_menu) and "sunk" in _all_text(main.result_menu)
+		and "Time" in _all_text(main.result_menu), "result shows outcome, reason and time")
+	# Frozen while the menu is up; repeated frames do not re-show or resume stepping.
+	var elapsed: float = main.sim.elapsed
+	for i in 30:
+		main.advance_tick()
+	t.check(main.mode == "result" and main.sim.elapsed == elapsed, "result menu freezes the simulation")
+	t.check(shown[0] == 1, "result mode entered exactly once over repeated frames")
+	# Held gameplay keys do not fire from menu activation.
+	_send(KEY_Q, true)
+	main.result_menu.replay_button.pressed.emit()
+	_send(KEY_Q, false)
+	t.check(main.mode == "sailing" and main.sim.elapsed == 0.0
+		and main.sim.ships[2]["hull"] > 0.0, "Replay restarts the duel fresh")
+	main.advance_tick()
+	t.check(main.sim.events.is_empty() and main.sim.projectiles.is_empty(),
+		"menu activation admits no stale volley")
+	# Restart with pending shot/cycle/recovery state also lands fresh.
+	_send(KEY_E, true)
+	main.advance_tick()
+	t.check(not main.sim.projectiles.is_empty(), "shot in flight before restart")
+	main.set_paused(true)
+	main.pause_menu.restart_button.pressed.emit()
+	t.check(main.mode == "sailing" and main.sim.elapsed == 0.0
+		and main.sim.projectiles.is_empty() and main.sim.ships[2]["position"] == Definitions.PRESETS["duel_brig"]["opposition"][0]["position"],
+		"pause Restart returns the same duel to fresh spawn")
+	# Return to selection and change preset/vessel.
+	main.set_paused(true)
+	main.pause_menu.return_button.pressed.emit()
+	t.check(main.mode == "selection" and main.sim.ships.is_empty(), "result/pause return stops the encounter")
+	sel.duel_buttons["duel_frigate"].pressed.emit()
+	sel.vessel_buttons["sloop"].button_pressed = true
+	sel.start_button.pressed.emit()
+	t.check(main.sim.preset_id == "duel_frigate" and main.sim.selected_vessel_id == "sloop",
+		"return then start changes preset and vessel")
 	main.return_to_selection()
