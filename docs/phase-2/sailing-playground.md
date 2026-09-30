@@ -111,7 +111,7 @@ export GODOT="$P/bin/Godot_v4.7.2-stable_linux.x86_64"
 "$GODOT" --headless --path game --export-release macos ../build/phase-2/macos/Tortuga-v0.1-macos.zip
 ```
 
-Published as GitHub release `v0.1` (private repo). On the Mac:
+Originally published as GitHub release `v0.1` (private repo). On the Mac:
 
 ```bash
 gh release download v0.1 --repo dnldxn/tortuga --pattern 'Tortuga-v0.1-macos.zip'
@@ -121,7 +121,11 @@ open Tortuga.app      # or: ./Tortuga.app/Contents/MacOS/Tortuga --resolution 12
 ```
 
 Export verified on Linux (bundle layout, universal Mach-O, pack runs headless). Native Mac
-launch and manual play: **passed**, owner-reported 2026-09-30 (see verification record).
+launch and manual play of the **original plan-01 archive**: **passed**, owner-reported
+2026-09-30 (see verification record). The owner subsequently requested that release `v0.1`
+be replaced with the plan-02 target-practice build; the original archive and tag no longer
+represent the current download. See `02-broadside-practice.md` for the replacement's checksum
+and pending real-display checks.
 
 Suites are registered explicitly in `game/tests/run_tests.gd` (`SUITES`). Each suite exposes
 `func run(t) -> bool` and must `return true`; a suite aborted by a script error counts as a
@@ -163,7 +167,7 @@ AI agent (automated only). Engine `4.7.2.stable.official.ed1daf0bf`.
 
 ### Real-display manual test — PASSED (macOS, owner-reported 2026-09-30)
 
-Observer: project owner. Build: GitHub release `v0.1` (`Tortuga-v0.1-macos.zip`, SHA-256
+Observer: project owner. Build: original GitHub release `v0.1` (`Tortuga-v0.1-macos.zip`, SHA-256
 `5d69a9c3840b19f21cb5a601b66d924c373602872545a7b971caf7cc2ec8932f`, commit `4f6edd8`), run
 natively on the owner's Mac. The owner reported the manual testing as verified. Individual
 observations, exact machine, display resolution and renderer output were not recorded

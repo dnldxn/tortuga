@@ -18,6 +18,8 @@ const Hud := preload("res://ui/hud.gd")
 const DT := 1.0 / 60.0
 const PRESET := "practice"
 const TURN_ACTIONS := ["turn_left", "turn_right"]
+## One-shot actions: a non-echo press while sailing queues one command for the next tick.
+const EDGE_ACTIONS := ["fire_port", "fire_starboard", "cycle_port", "cycle_starboard"]
 
 var sim = NavalSimulation.new()
 var mode := "selection"
@@ -29,6 +31,8 @@ var pause_menu: Control
 
 var _held := {}  # turn actions freshly pressed while sailing and not yet released
 var _toggle_queued := false  # parity of non-echo toggle presses since the last tick
+var _edges := {}  # EDGE_ACTIONS pressed since the last tick (held keys never repeat)
+var _reset_queued := false  # reset_practice pressed since the last tick
 
 
 func _ready() -> void:
@@ -56,10 +60,22 @@ func _physics_process(_delta: float) -> void:
 func advance_tick() -> void:
 	if mode != "sailing":
 		return
+	if _reset_queued:
+		# This tick is the reset: fire/cycle/toggle queued alongside it are discarded, not
+		# deferred (restart clears all held/queued input), and views resync via practice_started.
+		restart_practice()
+		return
 	var turn := float(_held.has("turn_right")) - float(_held.has("turn_left"))
-	var commands := {NavalSimulation.PLAYER_ID: {"turn": turn, "toggle_sails": _toggle_queued}}
+	var command := {"turn": turn, "toggle_sails": _toggle_queued}
+	for action in EDGE_ACTIONS:
+		command[action] = _edges.has(action)
 	_toggle_queued = false
-	sim.step(DT, commands)
+	_edges.clear()
+	sim.step(DT, {NavalSimulation.PLAYER_ID: command})
+	arena_view.advance_effects()
+	hud.advance_effects()
+	arena_view.consume_events(sim.events)
+	hud.consume_events(sim.events)
 	hud.refresh(sim)
 
 
@@ -68,6 +84,8 @@ func start_practice(vessel_id: String) -> void:
 		push_error("start_practice: unknown vessel '%s'" % vessel_id)
 		return
 	sim.reset(PRESET, vessel_id)
+	hud.reset_effects()
+	arena_view.reset_effects()
 	_enter_mode("sailing")
 	practice_started.emit()
 
@@ -79,6 +97,8 @@ func restart_practice() -> void:
 
 func return_to_selection() -> void:
 	sim = NavalSimulation.new()
+	hud.reset_effects()
+	arena_view.reset_effects()
 	_enter_mode("selection")
 
 
@@ -100,8 +120,14 @@ func _input(event: InputEvent) -> void:
 				_held.erase(action)
 			elif mode == "sailing" and not event.echo:
 				_held[action] = true
-	if mode == "sailing" and event.is_action_pressed("toggle_sails"):
-		_toggle_queued = not _toggle_queued
+	if mode == "sailing":
+		if event.is_action_pressed("toggle_sails"):  # is_action_pressed excludes echoes
+			_toggle_queued = not _toggle_queued
+		for action in EDGE_ACTIONS:
+			if event.is_action_pressed(action):
+				_edges[action] = true
+		if event.is_action_pressed("reset_practice"):
+			_reset_queued = true
 	if event.is_action_pressed("pause") and mode != "selection":
 		set_paused(mode == "sailing")
 		get_viewport().set_input_as_handled()
@@ -134,6 +160,8 @@ func _enter_mode(new_mode: String) -> void:
 func _clear_input() -> void:
 	_held.clear()
 	_toggle_queued = false
+	_edges.clear()
+	_reset_queued = false
 
 
 ## Shared UI look: >= 18 px text, white outlined labels, semi-opaque dark panels.

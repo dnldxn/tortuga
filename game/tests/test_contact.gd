@@ -32,12 +32,9 @@ func run(t) -> bool:
 # --- helpers -----------------------------------------------------------------
 
 func _ship(id: int, vessel_id: String, pos: Vector2, active := true) -> Dictionary:
-	var v: Dictionary = Definitions.VESSELS[vessel_id]
-	return {
-		"id": id, "team": 0 if id == 1 else 1, "vessel_id": vessel_id, "position": pos,
-		"heading": 0.0, "speed": 0.0, "reefed": false,
-		"hull": v["hull"], "sails": v["sails"], "crew": v["crew"], "active": active,
-	}
+	var ship: Dictionary = NavalSimulation.make_ship(id, 0 if id == 1 else 1, vessel_id, pos, 0.0)
+	ship["active"] = active
+	return ship
 
 
 func _sim_with(list: Array, reverse := false):

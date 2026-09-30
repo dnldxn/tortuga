@@ -1,6 +1,5 @@
 extends RefCounted
 ## Centralized starting-balance data (tuning values, not measurements).
-## Guns/reload are vessel metadata only; weapon state/behavior arrives in plan 02.
 
 const ARENA_SIZE := Vector2(6000, 4200)
 const ARENA_MARGIN := 160.0
@@ -35,6 +34,11 @@ const PRESETS := {
 		"player_position": Vector2(2500, 2100),
 		"player_heading": 0.0,
 		"wind_heading": 0.0,
+		## Non-player ships built by reset. team 1 = opposition. A practice_target never
+		## sails or acts on commands, but takes damage and is pushed by contact.
+		"opposition": [
+			{"id": 2, "team": 1, "vessel_id": "brig", "position": Vector2(3000, 2100), "heading": 0.0, "role": "practice_target"},
+		],
 	},
 }
 
@@ -43,6 +47,16 @@ const PRESETS := {
 const WIND_KNOTS: Array[float] = [0.8, 1.0, 0.95, 0.45, 0.12]
 const REEF_SPEED_FACTOR := 0.65
 const REEF_TURN_FACTOR := 1.4
+
+## Each ammo type damages exactly one track. Speed in units/s, range in units.
+const AMMO := {
+	"round": {"display_name": "Round", "range": 900.0, "speed": 600.0, "damage": 8.0, "track": "hull"},
+	"chain": {"display_name": "Chain", "range": 600.0, "speed": 500.0, "damage": 6.0, "track": "sails"},
+	"grape": {"display_name": "Grape", "range": 300.0, "speed": 450.0, "damage": 5.0, "track": "crew"},
+}
+const AMMO_CYCLE: Array[String] = ["round", "chain", "grape"]
+const SIDES: Array[String] = ["port", "starboard"]  # port = heading - PI/2, starboard = heading + PI/2
+const ARC_HALF_ANGLE := 12.0 * PI / 180.0  # aim-assist cone around each broadside
 
 
 ## Wraps an angle into [-PI, PI).

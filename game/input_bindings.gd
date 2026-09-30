@@ -1,6 +1,6 @@
 extends RefCounted
 ## Central gameplay action catalog (logical keys). Built-in ui_* navigation stays separate.
-## fire_*/cycle_*/reset_practice are reserved: no handler or prompt until plan 02.
+## fire_*/cycle_*/reset_practice are handled by main.gd as one-shot press edges (plan 02).
 ## ponytail: defaults only; plan 06 adds remapping/persistence.
 
 const DEFAULTS := {

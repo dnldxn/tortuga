@@ -22,10 +22,46 @@ const LAND := Color(0.42, 0.55, 0.3)
 const SAND := Color(0.9, 0.82, 0.58)
 const LIMIT := Color(1.0, 0.92, 0.55)
 const WARNING := "Shallows / Turn back"
+const TARGET_INK := Color(1.0, 0.9, 0.55)
+const SHOT_INK := Color(1.0, 0.98, 0.85)
 
 var main: Node
 var camera := Camera2D.new()
 var _ships := {}  # ship id -> Sprite2D
+var _cues := []  # deep-copied events with ticks; never aliases sim.events
+var marker_layer: CanvasLayer
+var marker_canvas: Control
+
+
+func advance_effects() -> void:
+	for cue in _cues:
+		cue["ticks"] -= 1
+	_cues = _cues.filter(func(cue): return cue["ticks"] > 0)
+	queue_redraw()
+
+
+func consume_events(events: Array) -> void:
+	for event in events:
+		if event["type"] in ["shot", "hit", "splash", "ship_defeated"]:
+			var cue: Dictionary = event.duplicate(true)
+			cue["ticks"] = 16 if cue["type"] == "shot" else 48
+			_cues.append(cue)
+	queue_redraw()
+
+
+func reset_effects() -> void:
+	_cues.clear()
+	queue_redraw()
+	if marker_canvas != null:
+		marker_canvas.queue_redraw()
+
+
+## Camera-centered viewport coordinates, inset so the arrow and its label remain visible.
+func target_marker(center: Vector2, target: Vector2, screen: Rect2) -> Dictionary:
+	var mid := screen.position + screen.size * 0.5
+	var projected := mid + (target - center) * camera.zoom
+	var safe := screen.grow(-32)
+	return {"offscreen": not safe.has_point(projected), "position": projected.clamp(safe.position, safe.end)}
 
 
 func _ready() -> void:
@@ -39,12 +75,20 @@ func _ready() -> void:
 	camera.limit_right = int(Definitions.ARENA_SIZE.x)
 	camera.limit_bottom = int(Definitions.ARENA_SIZE.y)
 	add_child(camera)
+	marker_layer = CanvasLayer.new()
+	add_child(marker_layer)
+	marker_canvas = Control.new()
+	marker_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
+	marker_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	marker_canvas.draw.connect(_draw_marker)
+	marker_layer.add_child(marker_canvas)
 	main.practice_started.connect(_on_practice_started)
 	main.mode_changed.connect(func(_mode: String) -> void: sync(main.sim))
 
 
 func _process(_delta: float) -> void:
 	sync(main.sim)
+	marker_canvas.queue_redraw()
 
 
 ## Reconciles ship nodes with sim.ships by stable id and points the camera at the player.
@@ -63,10 +107,14 @@ func sync(sim) -> void:
 		node.visible = ship["active"]
 		node.position = ship["position"]
 		node.rotation = ship["heading"]
+		var condition: Dictionary = Definitions.VESSELS[ship["vessel_id"]]
+		node.modulate = Color.WHITE.lerp(Color(0.65, 0.5, 0.44), 1.0 - ship["hull"] / condition["hull"])
 		for patch in node.get_node("Sails").get_children():
 			patch.scale = REEFED_SAIL_SCALE if ship["reefed"] else Vector2.ONE
+			patch.color = Color(0.96, 0.93, 0.84, 0.95).lerp(Color(0.48, 0.42, 0.36), 1.0 - ship["sails"] / condition["sails"])
 	if sim.ships.has(sim.PLAYER_ID):
 		camera.position = sim.ships[sim.PLAYER_ID]["position"]
+	queue_redraw()
 
 
 func _on_practice_started() -> void:
@@ -134,6 +182,81 @@ func _draw() -> void:
 		_warning(font, Vector2(size.x - m + 36, y), -PI / 2.0)
 		_buoy(Vector2(m - 12, y + 40))
 		_buoy(Vector2(size.x - m + 12, y + 40))
+	_draw_combat()
+
+
+func _draw_combat() -> void:
+	if main == null or main.sim.ships.is_empty():
+		return
+	var sim = main.sim
+	var font := ThemeDB.fallback_font
+	var player: Dictionary = sim.ships.get(sim.PLAYER_ID, {})
+	if not player.is_empty() and player["active"]:
+		for side in Definitions.SIDES:
+			var aim: Dictionary = sim.aim_for(sim.PLAYER_ID, side)
+			var bearing: float = player["heading"] + (-PI / 2.0 if side == "port" else PI / 2.0)
+			var radius: float = aim["range"]
+			var ink := Color(1.0, 0.94, 0.67, 0.5) if aim["target_id"] != null else Color(1.0, 1.0, 1.0, 0.25)
+			for edge in [-1.0, 1.0]:
+				draw_line(player["position"], player["position"] + Vector2.from_angle(bearing + edge * Definitions.ARC_HALF_ANGLE) * radius, ink, 1.5)
+			draw_arc(player["position"], radius, bearing - Definitions.ARC_HALF_ANGLE,
+				bearing + Definitions.ARC_HALF_ANGLE, 24, ink, 2.0)
+	for id in sim.ships:
+		var ship: Dictionary = sim.ships[id]
+		if ship["role"] != "practice_target":
+			continue
+		var p: Vector2 = ship["position"]
+		var r: float = Definitions.VESSELS[ship["vessel_id"]]["radius"] + 12
+		draw_arc(p, r, 0, TAU, 32, TARGET_INK, 3.0)
+		var title := "TARGET · %s" % (" / ".join(ship["defeat_reasons"]).to_upper() if not ship["active"] else "BRIG")
+		_draw_text(font, p + Vector2(-50, -r - 12), title, TARGET_INK)
+	for shot in sim.projectiles:
+		var p: Vector2 = shot["position"]
+		draw_circle(p, 5, Color.BLACK)
+		draw_circle(p, 3, SHOT_INK)
+		draw_line(p - shot["direction"] * 11, p, SHOT_INK, 2.0)
+	for cue in _cues:
+		var p: Vector2 = cue["position"]
+		var fraction: float = float(cue["ticks"]) / (16.0 if cue["type"] == "shot" else 48.0)
+		match cue["type"]:
+			"shot":
+				var ship: Dictionary = sim.ships.get(cue["ship_id"], {})
+				if not ship.is_empty():
+					p = cue["position"] + cue["direction"] * Definitions.VESSELS[ship["vessel_id"]]["radius"]
+				draw_circle(p, 4 + 6 * fraction, Color(1.0, 0.9, 0.5, 0.8 * fraction))
+			"hit":
+				draw_arc(p, 9 + 12 * (1.0 - fraction), 0, TAU, 24, TARGET_INK * Color(1, 1, 1, fraction), 3.0)
+				draw_line(p + Vector2(-7, -7), p + Vector2(7, 7), Color.WHITE, 2.0)
+				if cue["track"] == "crew":
+					_draw_text(font, p + Vector2(12, -16), "CREW -%d" % cue["damage"], Color.WHITE)
+			"splash":
+				draw_arc(p, 7 + 12 * (1.0 - fraction), 0, TAU, 24, Color(0.9, 0.98, 1, fraction), 2.0)
+				draw_line(p + Vector2(-5, 0), p + Vector2(5, 0), Color.WHITE, 2.0)
+			"ship_defeated":
+				_draw_text(font, p + Vector2(-32, -20), "DEFEATED", TARGET_INK)
+
+
+func _draw_marker() -> void:
+	if main == null or main.sim.ships.is_empty() or not main.sim.ships.has(2):
+		return
+	var screen := Rect2(Vector2.ZERO, marker_canvas.size)
+	var target: Vector2 = main.sim.ships[2]["position"]
+	var marker := target_marker(camera.get_screen_center_position(), target, screen)
+	if not marker["offscreen"]:
+		return
+	var p: Vector2 = marker["position"]
+	var direction: Vector2 = (target - camera.get_screen_center_position()).normalized()
+	var across := direction.orthogonal()
+	marker_canvas.draw_colored_polygon(PackedVector2Array([p + direction * 14, p - direction * 8 + across * 9,
+		p - direction * 8 - across * 9]), TARGET_INK)
+	var label_pos := p - direction * 45 + Vector2(-32, 5)
+	marker_canvas.draw_string_outline(ThemeDB.fallback_font, label_pos, "TARGET", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 4, Color.BLACK)
+	marker_canvas.draw_string(ThemeDB.fallback_font, label_pos, "TARGET", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, TARGET_INK)
+
+
+func _draw_text(font: Font, p: Vector2, text: String, ink: Color) -> void:
+	draw_string_outline(font, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 5, Color.BLACK)
+	draw_string(font, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ink)
 
 
 ## West coast: jagged land with a sand fringe and hill marks, all west of the shallows limit.

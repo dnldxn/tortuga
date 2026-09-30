@@ -79,7 +79,7 @@ func _test_vessel_resets(t) -> void:
 		sim.reset("practice", vessel_id)
 		t.check(sim.preset_id == "practice", "%s preset_id" % vessel_id)
 		t.check(sim.selected_vessel_id == vessel_id, "%s selected_vessel_id" % vessel_id)
-		t.check(sim.ships.keys() == [1], "%s only player ship (id 1)" % vessel_id)
+		t.check(sim.ships.keys() == [1, 2], "%s player ship (id 1) plus practice target (id 2)" % vessel_id)
 		var ship: Dictionary = sim.ships.get(1, {})
 		t.check(ship.get("id") == 1 and ship.get("team") == 0, "%s player id/team" % vessel_id)
 		t.check(ship.get("vessel_id") == vessel_id, "%s ship vessel_id" % vessel_id)

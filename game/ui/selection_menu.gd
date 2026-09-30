@@ -1,5 +1,5 @@
 extends Control
-## Mode select (Sailing practice / Quit) -> vessel select (vessels / Start / Back).
+## Mode select (Target practice / Quit) -> vessel select (vessels / Start / Back).
 
 signal start_requested(vessel_id: String)
 signal quit_requested
@@ -21,7 +21,7 @@ func _ready() -> void:
 	var title := Label.new()
 	title.text = "Tortuga"
 	title.add_theme_font_size_override("font_size", 48)
-	sailing_button = _button("Sailing practice")
+	sailing_button = _button("Target practice")
 	quit_button = _button("Quit")
 	_mode_screen = _screen([title, sailing_button, quit_button])
 

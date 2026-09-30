@@ -21,12 +21,20 @@ func run(t) -> bool:
 	_test_restart_snaps_camera(t)
 	_test_return_and_switch(t)
 	_test_wind_arrow(t)
+	_test_cue_lifecycle(t)
+	_test_target_marker(t)
+	_test_condition_visuals(t)
 	main.free()
 	return true
 
 
 func _ship_nodes() -> Array:
 	return view.get_children().filter(func(n): return n is Sprite2D)
+
+
+## The view keys sprites by stable ship id; practice also has the target (id 2).
+func _player_node() -> Sprite2D:
+	return view._ships[main.sim.PLAYER_ID]
 
 
 func _snapshot() -> Dictionary:
@@ -66,9 +74,9 @@ func _test_vessel(t, vessel_id: String) -> void:
 	t.check(_snapshot() == snap, "%s: view sync does not mutate sim" % vessel_id)
 	var active: Array = main.sim.ships.keys().filter(func(id): return main.sim.ships[id]["active"])
 	var nodes := _ship_nodes()
-	t.check(nodes.size() == active.size() and nodes.size() == 1, "%s: one ship node per active ship" % vessel_id)
+	t.check(nodes.size() == active.size() and nodes.size() == 2, "%s: one ship node per active ship (player + target)" % vessel_id)
 	var ship: Dictionary = main.sim.ships[main.sim.PLAYER_ID]
-	var node: Sprite2D = nodes[0]
+	var node: Sprite2D = _player_node()
 	t.check(node.position == ship["position"], "%s: node position matches sim" % vessel_id)
 	t.near(node.rotation, ship["heading"], 1e-5, "%s: rotation equals heading" % vessel_id)
 	t.check(absf(ship["heading"]) > 0.01, "%s: heading actually changed during test" % vessel_id)
@@ -93,7 +101,7 @@ func _test_restart_snaps_camera(t) -> void:
 	var spawn: Vector2 = Definitions.PRESETS["practice"]["player_position"]
 	t.check(view.camera.position == spawn, "restart: camera target at spawn")
 	t.check(view.camera.get_screen_center_position().distance_to(spawn) < 1.0, "restart: smoothing reset to spawn")
-	t.check(_ship_nodes()[0].position == spawn, "restart: ship node at spawn")
+	t.check(_player_node().position == spawn, "restart: player ship node at spawn")
 
 
 func _test_return_and_switch(t) -> void:
@@ -106,7 +114,8 @@ func _test_return_and_switch(t) -> void:
 	main.start_practice("sloop")
 	view.sync(main.sim)
 	var nodes := _ship_nodes()
-	t.check(nodes.size() == 1 and nodes[0].get_meta("vessel_id") == "sloop", "switch vessel: exactly one sloop node")
+	t.check(nodes.size() == 2 and _player_node().get_meta("vessel_id") == "sloop" and view._ships[2].get_meta("vessel_id") == "brig",
+		"switch vessel: player sloop node plus brig target node")
 	for i in 10:
 		main.return_to_selection()
 		main.start_practice("frigate")
@@ -118,6 +127,56 @@ func _test_wind_arrow(t) -> void:
 	var arrow: Control = main.hud.wind_arrow
 	t.check(arrow.draw.get_connections().size() == 1, "wind arrow draws via its draw signal")
 	t.near(main.hud.wind_heading, main.sim.wind_heading, 1e-9, "wind arrow heading reads sim")
+
+
+func _test_cue_lifecycle(t) -> void:
+	main.start_practice("sloop")
+	main.sim.ships[1]["heading"] = -PI / 2.0  # port points west; starboard points at brig
+	main._input(_key(KEY_E, true))
+	main._input(_key(KEY_E, false))
+	main.advance_tick()
+	t.check(view._cues.size() == 4 and view._cues[0]["type"] == "shot", "volley produces transient muzzle cues")
+	t.check(main.sim.projectiles.size() == 4, "projectile travel represented by live sim state")
+	var life: int = view._cues[0]["ticks"]
+	main.set_paused(true)
+	for i in 12:
+		main.advance_tick()
+	t.check(view._cues[0]["ticks"] == life, "pause freezes effect lifetime")
+	main.set_paused(false)
+	main.advance_tick()
+	t.check(view._cues[0]["ticks"] == life - 1, "one resumed tick ages cues once")
+	view.consume_events([{"type": "hit", "position": Vector2(1, 2), "track": "crew", "damage": 5}])
+	t.check(view._cues.any(func(c): return c["type"] == "hit" and c["track"] == "crew"), "crew hit has a cue")
+	main.restart_practice()
+	t.check(view._cues.is_empty() and main.sim.projectiles.is_empty(), "reset clears cues and in-flight shots")
+
+
+func _test_target_marker(t) -> void:
+	main.start_practice("sloop")
+	var center: Vector2 = main.sim.ships[1]["position"]
+	var target: Vector2 = main.sim.ships[2]["position"]
+	var screen := Rect2(Vector2.ZERO, Vector2(1280, 720))
+	var off: Dictionary = view.target_marker(center, target + Vector2(1200, 0), screen)
+	t.check(off["offscreen"] and off["position"].x <= 1280 and off["position"].x > 640,
+		"distant target marker clamps to right edge toward target")
+	var on: Dictionary = view.target_marker(center, target, screen)
+	t.check(not on["offscreen"] and on["position"].distance_to(Vector2(1140, 360)) < 1.0,
+		"near target marker lies at projected screen position")
+	main.sim.ships[2]["position"] = center + Vector2(-1200, -900)
+	var upper_left: Dictionary = view.target_marker(center, main.sim.ships[2]["position"], screen)
+	t.check(upper_left["offscreen"] and upper_left["position"].x < 640 and upper_left["position"].y < 360,
+		"offscreen marker points toward upper-left target")
+
+
+func _test_condition_visuals(t) -> void:
+	main.start_practice("brig")
+	main.sim.ships[2]["hull"] = 80.0
+	main.sim.ships[2]["sails"] = 25.0
+	view.sync(main.sim)
+	var target: Sprite2D = view._ships[2]
+	t.check(target.modulate != Color.WHITE, "damaged hull changes sprite appearance")
+	t.check(target.get_node("Sails").get_child(0).color != Color(0.96, 0.93, 0.84, 0.95),
+		"damaged sails change canvas appearance")
 
 
 func _count(node: Node) -> int:

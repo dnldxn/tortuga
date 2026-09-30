@@ -7,7 +7,7 @@ const Definitions := preload("res://sim/definitions.gd")
 
 const DT := 1.0 / 60.0
 const GUIDANCE := "Full sails: faster · Reefed: tighter turns · Into the wind is slow, but you can still turn."
-const BANNER := "Sailing practice — no target yet."
+const BANNER := "TARGET · Brig"
 
 var main
 
@@ -26,7 +26,14 @@ func run(t) -> bool:
 	_test_focus_loss(t)
 	_test_restart_and_return(t)
 	_test_hud(t)
+	_test_weapon_hud(t)
+	_test_event_handoff(t)
+	_test_fire_edges(t)
+	_test_cycle_edges(t)
+	_test_reset_key(t)
+	_test_pause_discards_edges(t)
 	_test_repeat_cycles(t)
+	_test_reset_ignored_in_selection(t)
 	main.free()
 	return true
 
@@ -66,7 +73,22 @@ func _snapshot() -> Dictionary:
 		"selected_vessel_id": sim.selected_vessel_id,
 		"wind_heading": sim.wind_heading,
 		"result": sim.result.duplicate(true),
+		"next_projectile_id": sim.next_projectile_id,
 	}
+
+
+func _events(type: String, side := "") -> Array:
+	return main.sim.events.filter(func(e): return e["type"] == type and (side == "" or e["side"] == side))
+
+
+## Snapshot of a freshly reset sim for the given vessel (same fields as _snapshot()).
+func _fresh(vessel_id: String) -> Dictionary:
+	var saved = main.sim
+	main.sim = saved.get_script().new()
+	main.sim.reset("practice", vessel_id)
+	var snap := _snapshot()
+	main.sim = saved
+	return snap
 
 
 func _count_nodes(node: Node) -> int:
@@ -118,7 +140,8 @@ func _test_initial_selection(t) -> void:
 	t.check(main.mode == "selection", "starts in selection")
 	t.check(main.selection.visible and not main.hud.visible and not main.pause_menu.visible,
 		"only selection visible at start")
-	t.check(main.selection.sailing_button.has_focus(), "Sailing practice button focused initially")
+	t.check(main.selection.sailing_button.text == "Target practice", "mode button reads Target practice")
+	t.check(main.selection.sailing_button.has_focus(), "Target practice button focused initially")
 	for i in 10:
 		main.advance_tick()
 	t.check(main.sim.ships.is_empty() and main.sim.elapsed == 0.0, "selection ticks do not advance")
@@ -270,7 +293,7 @@ func _test_restart_and_return(t) -> void:
 	t.check(main.mode == "selection", "return enters selection")
 	t.check(main.sim.ships.is_empty(), "return discards encounter state")
 	t.check(main.selection.visible and not main.hud.visible and not main.pause_menu.visible, "return shows only selection")
-	t.check(main.selection.sailing_button.has_focus(), "return focuses Sailing practice")
+	t.check(main.selection.sailing_button.has_focus(), "return focuses Target practice")
 	main.advance_tick()
 	t.check(main.sim.elapsed == 0.0, "selection after return does not tick")
 
@@ -301,6 +324,9 @@ func _test_hud(t) -> void:
 	t.check("REEFED" in _all_text(hud), "HUD shows reefed")
 	for control in [hud.bindings_label, main.selection.sailing_button, main.pause_menu.resume_button]:
 		t.check(control.get_theme_font_size("font_size") >= 18, "font size >= 18 for %s" % control.name)
+	var content: MarginContainer = hud.get_child(0)
+	t.check(content.get_combined_minimum_size().x <= 1280,
+		"HUD panels and control legend intrinsic width fit 1280px viewport")
 
 
 func _all_text(node: Node) -> String:
@@ -310,6 +336,79 @@ func _all_text(node: Node) -> String:
 	for child in node.get_children():
 		out += _all_text(child)
 	return out
+
+
+func _test_weapon_hud(t) -> void:
+	main.start_practice("sloop")
+	var hud = main.hud
+	var text := _all_text(hud)
+	t.check("Port · Round · 4/4 ready" in text and "Starboard · Round · 4/4 ready" in text,
+		"HUD shows independently loaded broadsides")
+	t.check(hud.side_labels["port"].get_parent().get_parent() != hud.name_label.get_parent().get_parent()
+		and hud.side_labels["starboard"].get_parent().get_parent() != hud.target_label.get_parent().get_parent(),
+		"each broadside occupies its own panel apart from ship conditions")
+	t.check("outside arc" in text and "900" in text, "initial target is outside arc; range still shown")
+	t.check("Round: hull / Chain: sails / Grape: crew" in text and "restarts that side" in text,
+		"ammo tracks and cycle reload cost explained")
+	main.sim.ships[1]["weapons"]["port"]["ammo"] = "grape"
+	main.sim.ships[1]["weapons"]["port"]["loads"] = [1.0, 0.5, 0.0, 0.25]
+	hud.refresh(main.sim)
+	t.check("Port · Grape · 1/4 ready" in _all_text(hud) and "2:50%" in _all_text(hud)
+		and "Starboard · Round · 4/4 ready" in _all_text(hud) and "Range 300" in _all_text(hud),
+		"one side changes ammo/range/progress without affecting opposite broadside")
+	main.sim.ships[1]["weapons"]["port"]["loads"] = [0.999, 0.0, 0.0, 0.0]
+	hud.refresh(main.sim)
+	t.check("Port · Grape · 0/4 ready" in hud.side_labels["port"].text
+		and "1:99%" in hud.side_labels["port"].text
+		and "1:100%" in hud.side_labels["starboard"].text,
+		"near-ready gun displays below 100%; fully loaded opposite side shows 100%")
+	# Leave enough headroom that this tick's reload cannot complete the gun before fire.
+	main.sim.ships[1]["weapons"]["port"]["loads"][0] = 0.99
+	_tap(KEY_Q)
+	main.advance_tick()
+	t.check(_events("fire_rejected", "port").size() == 1 and _events("shot", "port").is_empty(),
+		"incomplete gun still cannot fire after a tick of reload")
+	main.start_practice("sloop")
+	for action in ["fire_port", "fire_starboard", "cycle_port", "cycle_starboard", "reset_practice"]:
+		InputMap.action_erase_events(action)
+		InputMap.action_add_event(action, _key(KEY_J, false))
+	hud.refresh(main.sim)
+	t.check("J fire" in _all_text(hud) and "J cycle" in _all_text(hud)
+		and "J reset" in _all_text(hud), "weapon prompts use live bindings")
+	for action in ["fire_port", "fire_starboard", "cycle_port", "cycle_starboard", "reset_practice"]:
+		InputMap.action_erase_events(action)
+	Bindings.install_defaults()
+	main.sim.ships[2]["active"] = false
+	main.sim.ships[2]["defeat_reasons"] = ["sails", "crew"]
+	hud.refresh(main.sim)
+	t.check("sails, crew" in _all_text(hud) and "no active enemy" in _all_text(hud),
+		"defeated target reasons and inactive aim are visible")
+	main.start_practice("sloop")
+
+
+func _test_event_handoff(t) -> void:
+	main.start_practice("sloop")
+	_tap(KEY_Q)
+	main.advance_tick()
+	t.check(main.arena_view._cues.size() == 4, "one volley forwarded to view in same tick")
+	t.check(main.hud._feedback.is_empty(), "successful fire does not report rejection")
+	main.sim.events[0]["position"] = Vector2(-100, -100)
+	t.check(main.arena_view._cues[0]["position"] != Vector2(-100, -100),
+		"view owns event snapshot rather than aliasing sim event")
+	_tap(KEY_Q)
+	main.advance_tick()
+	t.check("no loaded guns" in _all_text(main.hud) and "outside arc" in _all_text(main.hud),
+		"rejected fire feedback is distinct from aim diagnostic")
+	main.set_paused(true)
+	var remaining: int = main.hud._feedback["port"]
+	for i in 10:
+		main.advance_tick()
+	t.check(main.hud._feedback["port"] == remaining, "paused fire feedback does not expire")
+	main.set_paused(false)
+	for i in remaining:
+		main.advance_tick()
+	t.check(main.hud._feedback.is_empty() and "no loaded guns" not in _all_text(main.hud),
+		"fire rejection expires after sailing ticks")
 
 
 func _test_repeat_cycles(t) -> void:
@@ -325,3 +424,113 @@ func _test_repeat_cycles(t) -> void:
 	t.check(_count_nodes(main) == nodes, "20 cycles keep node count (%d)" % nodes)
 	t.check(_connection_counts() == connections, "20 cycles keep signal connection counts")
 	t.check(main.mode == "selection" and main.sim.ships.is_empty(), "cycles end cleanly in selection")
+
+
+func _test_fire_edges(t) -> void:
+	main.start_practice("sloop")
+	_send(KEY_D, true)
+	_send(KEY_Q, true)
+	var heading: float = _ship()["heading"]
+	main.advance_tick()
+	t.check(_events("shot", "port").size() == 4 and _events("shot", "starboard").is_empty(), "Q press fires one port volley")
+	t.check(_ship()["heading"] > heading, "steering held alongside fire still turns")
+	_send(KEY_Q, true, true)
+	var quiet := true
+	for i in 300:  # past sloop gun 0's 4.55 s reload: a held key must not auto-fire
+		main.advance_tick()
+		quiet = quiet and _events("shot").is_empty() and _events("fire_rejected").is_empty()  # splashes are fine
+	t.check(quiet, "held/echoed Q never refires, even after reload")
+	_send(KEY_Q, false)
+	_send(KEY_D, false)
+	_tap(KEY_Q)
+	_tap(KEY_Q)
+	main.advance_tick()
+	t.check(_events("shot", "port").size() == 1, "two presses before one tick fire once (only the reloaded gun)")
+	main.advance_tick()
+	t.check(_events("shot").is_empty() and _events("fire_rejected").is_empty(), "queued fire consumed and cleared")
+	_tap(KEY_Q)
+	main.advance_tick()
+	t.check(_events("fire_rejected", "port").size() == 1 and _events("shot").is_empty(), "fresh Q with no loaded guns: rejection feedback")
+	_tap(KEY_E)
+	main.advance_tick()
+	t.check(_events("shot", "starboard").size() == 4 and _events("shot", "port").is_empty(), "E fires one starboard volley")
+
+
+func _test_cycle_edges(t) -> void:
+	main.start_practice("brig")
+	_send(KEY_Z, true)
+	main.advance_tick()
+	var port: Dictionary = _ship()["weapons"]["port"]
+	t.check(port["ammo"] == "chain" and port["loads"].all(func(l): return l < 0.01), "Z cycles port to chain and restarts reload")
+	t.check(_ship()["weapons"]["starboard"]["ammo"] == "round", "Z leaves starboard")
+	_send(KEY_Z, true, true)
+	for i in 5:
+		main.advance_tick()
+	t.check(_ship()["weapons"]["port"]["ammo"] == "chain", "held/echoed Z cycles only once")
+	_send(KEY_Z, false)
+	_tap(KEY_C)
+	main.advance_tick()
+	t.check(_ship()["weapons"]["starboard"]["ammo"] == "chain", "C cycles starboard")
+
+
+func _test_reset_key(t) -> void:
+	main.start_practice("frigate")
+	var fresh := _fresh("frigate")
+	var starts := [0]
+	var on_start := func(): starts[0] += 1
+	main.practice_started.connect(on_start)
+	_send(KEY_D, true)
+	_tap(KEY_Q)
+	_tap(KEY_C)
+	_tap(KEY_W)
+	for i in 30:
+		main.advance_tick()
+	t.check(main.sim.next_projectile_id > 1 and not main.sim.projectiles.is_empty(), "dirty frigate practice with shots in flight")
+	_tap(KEY_E)
+	_tap(KEY_Z)
+	_send(KEY_R, true)
+	main.advance_tick()
+	t.check(_snapshot() == fresh, "R resets to exact fresh state; fire/cycle in the same tick discarded")
+	t.check(main.mode == "sailing" and _ship()["vessel_id"] == "frigate", "reset keeps sailing and the vessel")
+	t.check(starts[0] == 1, "reset emits practice_started once (view resync)")
+	_send(KEY_R, true, true)
+	main.advance_tick()
+	t.near(main.sim.elapsed, DT, 1e-12, "held/echoed R does not reset again; next tick advances")
+	t.check(main.sim.events.is_empty() and main.sim.next_projectile_id == 1, "no stale fire after reset")
+	t.near(_ship()["heading"], 0.0, 1e-12, "held D cleared by reset until pressed again")
+	_send(KEY_R, false)
+	_send(KEY_D, false)
+	main.practice_started.disconnect(on_start)
+
+
+func _test_pause_discards_edges(t) -> void:
+	main.start_practice("sloop")
+	_tap(KEY_Q)
+	_tap(KEY_Z)
+	_tap(KEY_R)
+	main.set_paused(true)
+	var snap := _snapshot()
+	_tap(KEY_Q)
+	_tap(KEY_C)
+	_tap(KEY_R)
+	for i in 5:
+		main.advance_tick()
+	t.check(main.mode == "paused" and _snapshot() == snap, "R/Q/C while paused change nothing")
+	main.set_paused(false)
+	main.advance_tick()
+	var ship := _ship()
+	t.near(main.sim.elapsed, snap["elapsed"] + DT, 1e-12, "resume: one tick, no deferred reset")
+	t.check(main.sim.events.is_empty() and ship["weapons"]["port"]["ammo"] == "round"
+		and ship["weapons"]["starboard"]["ammo"] == "round", "resume: no deferred fire/cycle")
+
+
+func _test_reset_ignored_in_selection(t) -> void:
+	main.return_to_selection()
+	_tap(KEY_R)
+	_tap(KEY_Q)
+	main.advance_tick()
+	t.check(main.mode == "selection" and main.sim.ships.is_empty(), "R/Q ignored in selection")
+	main.start_practice("sloop")
+	main.advance_tick()
+	t.check(main.sim.events.is_empty() and main.sim.elapsed == DT, "selection presses not deferred into practice")
+	main.return_to_selection()
