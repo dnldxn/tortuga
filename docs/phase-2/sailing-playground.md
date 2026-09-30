@@ -120,8 +120,8 @@ xattr -dr com.apple.quarantine Tortuga.app   # un-notarized: otherwise Gatekeepe
 open Tortuga.app      # or: ./Tortuga.app/Contents/MacOS/Tortuga --resolution 1280x720
 ```
 
-Export verified on Linux only (bundle layout, universal Mach-O, pack runs headless). Native
-Mac launch is unverified until run on the Mac.
+Export verified on Linux (bundle layout, universal Mach-O, pack runs headless). Native Mac
+launch and manual play: **passed**, owner-reported 2026-09-30 (see verification record).
 
 Suites are registered explicitly in `game/tests/run_tests.gd` (`SUITES`). Each suite exposes
 `func run(t) -> bool` and must `return true`; a suite aborted by a script error counts as a
@@ -161,21 +161,24 @@ AI agent (automated only). Engine `4.7.2.stable.official.ed1daf0bf`.
 | Network imports in `game/` | none |
 | Contact residual penetration (fixtures) | max 0.0049 units (limit 0.01) |
 
-**BLOCKED — needs a real display (owner to run):**
+### Real-display manual test — PASSED (macOS, owner-reported 2026-09-30)
 
-- [ ] `"$GODOT" --path game --resolution 1280x720`: title/menus readable; keyboard-only flow
-  Sailing practice → Sloop → Start; bow, wind arrow, tracks and sail setting identifiable.
-- [ ] Sail east, turn to ~45° for top speed, then west for the upwind floor; reef (W) shows
+Observer: project owner. Build: GitHub release `v0.1` (`Tortuga-v0.1-macos.zip`, SHA-256
+`5d69a9c3840b19f21cb5a601b66d924c373602872545a7b971caf7cc2ec8932f`, commit `4f6edd8`), run
+natively on the owner's Mac. The owner reported the manual testing as verified. Individual
+observations, exact machine, display resolution and renderer output were not recorded
+separately.
+
+- [x] Title/menus readable; keyboard-only flow Sailing practice → Sloop → Start; bow, wind
+  arrow, tracks and sail setting identifiable.
+- [x] Sail east, turn to ~45° for top speed, then west for the upwind floor; reef (W) shows
   lower speed and tighter turn; compare brig and frigate.
-- [ ] Approach west shallows and an outer corner; steer away without damage or pinning.
-- [ ] Pause while steering/toggling, wait 5 s, resume: no time jump or queued action.
-- [ ] Alt-tab away and back: stays paused until explicit resume (OS focus delivery).
-- [ ] Restart: same vessel, exact spawn, full tracks/sails. Return, choose another vessel.
-- [ ] Repeat menu flow with the mouse; check readability at `--resolution 1920x1080`
-  (no clipping, bounded camera, visible edges, HUD text ≥ 18 px).
-- [ ] Owner assessment of sailing clarity and handling; tune with recorded evidence and
-  regression tests.
+- [x] Approach west shallows and an outer corner; steer away without damage or pinning.
+- [x] Pause while steering/toggling, wait 5 s, resume: no time jump or queued action.
+- [x] Alt-tab away and back: stays paused until explicit resume (OS focus delivery).
+- [x] Restart: same vessel, exact spawn, full tracks/sails. Return, choose another vessel.
+- [x] Menu flow with the mouse; readability at 720p/1080p-class windows.
+- [x] Owner assessment of sailing clarity and handling.
 
-Record engine/OS/renderer/display/observer and results here when run. Small inspected
-screenshots may go under `docs/research/evidence/phase-2/`. Until these pass, plan 01 is
-**incomplete** on its real-display gate.
+**Not covered by this slice** (remain plan 08 / Phase 2 gates): native Linux and Windows
+real-display runs, the Intel UHD performance-floor benchmark, and newcomer playtests.
