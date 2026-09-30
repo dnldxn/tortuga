@@ -84,6 +84,25 @@ const AMMO_CYCLE: Array[String] = ["round", "chain", "grape"]
 const SIDES: Array[String] = ["port", "starboard"]  # port = heading - PI/2, starboard = heading + PI/2
 const ARC_HALF_ANGLE := 12.0 * PI / 180.0  # aim-assist cone around each broadside
 
+## Opposition AI tuning: initial, unmeasured values. Radii/angles in world units/radians.
+const AI := {
+	"orbit_radius": {"round": 520.0, "chain": 380.0, "grape": 190.0},
+	"radial_gain": 160.0,
+	"radial_clamp": 2.0,
+	"turn_dead": 3.0 * PI / 180.0,
+	"turn_gain": 0.35,
+	"reef_error": 35.0 * PI / 180.0,
+	"full_sail_error": 15.0 * PI / 180.0,
+	"candidate_stable_s": 1.0,
+	"switch_cooldown_s": 10.0,
+	"ammo_range_factor": 0.9,
+	"grape_crew_fraction": 0.65,
+	"chain_sail_fraction": 0.65,
+	"speed_ratio": 1.15,
+	"chain_healthy_sail_fraction": 0.45,
+	"fire_bearing": 10.0 * PI / 180.0,  # inside the player's 12-degree assist cone
+}
+
 
 ## Wraps an angle into [-PI, PI).
 static func wrap_angle(angle: float) -> float:
