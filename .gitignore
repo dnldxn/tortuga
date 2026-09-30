@@ -1,3 +1,6 @@
 status.md
+.agents/
+.superpowers/
+
 /game/.godot/
 /build/phase-2/

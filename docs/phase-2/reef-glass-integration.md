@@ -93,7 +93,8 @@ Temporary evidence:
 Screenshots and final test/render logs were also saved under the gitignored
 `build/phase-2/reef-glass/` directory (`menu.png`, `practice.png`, `paused.png`,
 `tests.log`, `web-render.log`). The temporary localhost verification server was
-stopped afterward; the existing Tailscale art-study server was not changed.
+stopped afterward. The Tailscale art-study server and standalone browser preview
+were subsequently retired at the owner's request; the game integration remains.
 
 Native macOS appearance, integrated-GPU performance, and a real-display playtest
 remain unverified. The temporary Web export is a verification artifact, not a

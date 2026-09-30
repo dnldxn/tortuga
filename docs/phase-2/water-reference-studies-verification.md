@@ -2,6 +2,15 @@
 
 Date: 2026-09-30.
 
+## Preview retired
+
+After Reef Glass was integrated into the game, the owner requested removal of
+the web preview. The server on `100.67.211.123:52099` was stopped and its served
+content/state directory moved to Trash. The standalone `tools/water-preview/`
+source was removed; it remains recoverable from commit `367b4a9`. Other Tailscale
+services and the game's Reef Glass implementation were not changed. The
+verification record below describes the preview before retirement.
+
 ## Delivered
 
 `tools/water-preview/index.html` contains three animated procedural water samples
