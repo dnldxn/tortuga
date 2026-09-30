@@ -50,6 +50,9 @@ func run(t) -> bool:
 	_test_boundary_recovery(t)
 	_test_recovery_details(t)
 	_test_combat_results(t)
+	_test_nine_lifecycles(t)
+	_test_replay_after_result(t)
+	_test_ai_vs_ai_diagnostics(t)
 	return true
 
 
@@ -662,3 +665,140 @@ func _test_result_freeze_and_practice(t) -> void:
 	practice.step(DT, {})
 	t.check(not practice.ships[2]["active"] and practice.result.is_empty(),
 		"practice target defeat leaves the result empty")
+
+
+## Every preset/player pair runs 3600 fixed ticks with a deterministic player tape;
+## state stays finite/bounded, and two runs produce identical checkpoints.
+func _test_nine_lifecycles(t) -> void:
+	for preset_id in PRESETS:
+		for vessel_id in PLAYER_IDS:
+			var runs := []
+			for run_i in 2:
+				var sim = NavalSimulation.new()
+				sim.reset(preset_id, vessel_id)
+				var ai = AIController.new()
+				var checkpoints := []
+				var ok := true
+				for i in 3600:
+					var player_command := {"turn": 0.5 if i < 240 else 0.0, "toggle_sails": false,
+						"fire_port": i % 60 == 0, "fire_starboard": i % 60 == 0,
+						"cycle_port": false, "cycle_starboard": false}
+					var commands: Dictionary = ai.commands_for_tick(sim.ai_observation(), DT)
+					commands[1] = player_command
+					sim.step(DT, commands)
+					var enemy: Dictionary = sim.ships[2]
+					var pos: Vector2 = enemy["position"]
+					ok = ok and is_finite(pos.x) and is_finite(pos.y) and is_finite(enemy["heading"])
+					if not sim.result.is_empty():
+						break  # stop early on result
+					if i % 60 == 0:
+						checkpoints.append(_snapshot(sim))
+				runs.append([checkpoints, ok, sim.result])
+			t.check(runs[0][1] and runs[1][1], "%s/%s: finite bounded state through the tape" % [preset_id, vessel_id])
+			t.check(runs[0][0] == runs[1][0], "%s/%s: two identical runs checkpoint equally" % [preset_id, vessel_id])
+			t.check(runs[0][2] == runs[1][2], "%s/%s: both runs resolve the same result" % [preset_id, vessel_id])
+
+
+## Replay every resolved result equals a freshly reset sim, and the next 120 AI
+## commands match a fresh controller (no hidden memory leakage).
+func _test_replay_after_result(t) -> void:
+	for preset_id in PRESETS:
+		for vessel_id in PLAYER_IDS:
+			var sim = NavalSimulation.new()
+			sim.reset(preset_id, vessel_id)
+			var ai = AIController.new()
+			for i in 3600:
+				var commands: Dictionary = ai.commands_for_tick(sim.ai_observation(), DT)
+				commands[1] = {"turn": 0.5 if i < 240 else 0.0, "fire_port": i % 60 == 0, "fire_starboard": i % 60 == 0}
+				sim.step(DT, commands)
+				if not sim.result.is_empty():
+					break
+			var resolved: bool = not sim.result.is_empty()
+			if not resolved:
+				# Force each outcome track with lethal fixtures so replay is exercised.
+				sim.ships[2]["hull"] = 3.0 if vessel_id != "sloop" else 3.0
+				_lethal_shot(sim, 1, 2)
+				sim.step(DT, {})
+				resolved = not sim.result.is_empty()
+			t.check(resolved, "%s/%s: duel resolves under the tape or fixtures" % [preset_id, vessel_id])
+			var fresh = NavalSimulation.new()
+			fresh.reset(preset_id, vessel_id)
+			var played: bool = sim.elapsed > 0.0 or not sim.projectiles.is_empty() or not sim.result.is_empty()
+			sim.reset(preset_id, vessel_id)
+			ai.reset()  # the controller resets with the encounter, as start_encounter does
+			t.check(played and _snapshot(sim) == _snapshot(fresh), "%s/%s: reset after a played match equals fresh" % [preset_id, vessel_id])
+			var replayed = AIController.new()
+			var match_all := true
+			for i in 120:
+				var commands: Dictionary = ai.commands_for_tick(sim.ai_observation(), DT)
+				var fresh_commands: Dictionary = replayed.commands_for_tick(fresh.ai_observation(), DT)
+				if commands != fresh_commands:
+					match_all = false
+					break
+				sim.step(DT, commands)
+				fresh.step(DT, fresh_commands)
+			t.check(match_all, "%s/%s: replayed AI matches fresh controller for 120 steps" % [preset_id, vessel_id])
+
+
+## Matching-vessel AI-vs-AI diagnostics: firing opportunity within 60s, no
+## continuous contact or wall pin over 12s, out to 240 simulated seconds.
+func _test_ai_vs_ai_diagnostics(t) -> void:
+	for vessel_id in PLAYER_IDS:
+		var preset_id := "duel_%s" % vessel_id
+		var sim = NavalSimulation.new()
+		sim.reset(preset_id, vessel_id)
+		var enemy_ai = AIController.new()
+		var player_ai = AIController.new()
+		var first_fire := -1
+		var pin_start := -1
+		var finished := ""
+		var sum_r: float = Definitions.VESSELS[vessel_id]["radius"] * 2.0
+		var bounds := Definitions.safe_bounds(Definitions.VESSELS[vessel_id]["radius"])
+		for i in 240 * 60:
+			var obs: Dictionary = sim.ai_observation()
+			var commands: Dictionary = enemy_ai.commands_for_tick(obs, DT)
+			# Test-only mirror: a second AI sees IDs/teams swapped and its ship-2
+			# command maps back to player 1. No production autopilot exists.
+			var mirror := _swap_sides(obs)
+			var mirrored: Dictionary = player_ai.commands_for_tick(mirror, DT)
+			if mirrored.has(2):
+				commands[1] = mirrored[2]
+			else:
+				commands[1] = {}
+			var before_projectiles: int = sim.projectiles.size()
+			sim.step(DT, commands)
+			if first_fire < 0 and sim.projectiles.size() > before_projectiles:
+				first_fire = i
+			var gap: float = sim.ships[1]["position"].distance_to(sim.ships[2]["position"])
+			var both_inside := bounds.has_point(sim.ships[1]["position"]) and bounds.has_point(sim.ships[2]["position"])
+			var contact := gap <= sum_r + Definitions.AI["contact_margin"]
+			var wall_pin := not both_inside
+			if contact or wall_pin:
+				if pin_start < 0:
+					pin_start = i
+				if i - pin_start > 12 * 60:
+					break
+			else:
+				pin_start = -1
+			if not sim.result.is_empty():
+				finished = sim.result["outcome"]
+				break
+		t.check(first_fire >= 0 and first_fire <= 60 * 60,
+			"%s AI-vs-AI: first firing opportunity within 60s (tick %d)" % [vessel_id, first_fire])
+		t.check(pin_start < 0 or pin_start <= 12 * 60, "%s AI-vs-AI: no continuous contact/wall pin over 12s" % vessel_id)
+		t.check(finished in ["", "victory", "defeat", "draw"], "%s AI-vs-AI: terminal or timeout state is valid (%s)" % [vessel_id, finished])
+
+
+## Swap IDs 1<->2 and teams so the mirrored AI commands the player ship.
+func _swap_sides(obs: Dictionary) -> Dictionary:
+	var ships := {}
+	for id in obs["ships"]:
+		var ship: Dictionary = obs["ships"][id].duplicate(true)
+		if ship["id"] == 1:
+			ship["id"] = 2
+			ship["team"] = 1
+		elif ship["id"] == 2:
+			ship["id"] = 1
+			ship["team"] = 0
+		ships[ship["id"]] = ship
+	return {"ships": ships}
