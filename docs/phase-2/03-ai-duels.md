@@ -73,17 +73,19 @@ new-player tuning target, not a forced timer; no timer was added.
 
 ## Playable demo (rendered evidence)
 
-**Not yet executed on this headless Linux box.** The commands are recorded above;
-the owner must run `"$GODOT" --path game` at 1280×720 (and 1920×1080) on a
-display-capable machine to verify: broadside maneuvering, readable enemy
+The checklist for a display-capable run: broadside maneuvering, readable enemy
 condition/distance, opponent maneuver/return fire, projectile misses, ordinary
 win/loss reasons, keyboard and mouse replay, all nine combinations, off-screen edge
-arrow, pause/focus behavior, and recorded screenshots/observations. Headless
-success cannot establish rendered usability — this table stays open until then.
+arrow and pause/focus behavior, at 1280×720 and 1920×1080.
+
+**Owner report, 2026-09-30:** The features were verified using the v0.1 plan-03 macOS
+build (tag on `d3f0a5e`, SHA-256 `7b3dbbf8…1e93ded`). This confirms a native
+real-display run; the owner did not provide per-combination observations,
+resolution, machine details, durations or screenshots, so those fields remain open.
 
 | Build / Godot version | Vessel / ammo | Resolution | Tester / machine | Observed result / failures |
 |---|---|---|---|---|
-| — | — | — | — | pending owner play |
+| v0.1 plan-03 macOS archive / Godot 4.7.2 | Not specified | Not specified | Project owner / Mac (details not specified) | Features verified; individual observations not supplied |
 
 ## Tuning notes
 
