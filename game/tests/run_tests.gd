@@ -12,6 +12,7 @@ const SUITES: Array[String] = [
 	"res://tests/test_weapons.gd",
 	"res://tests/test_projectile_damage.gd",
 	"res://tests/test_practice.gd",
+	"res://tests/test_ai_duels.gd",
 ]
 
 var checks := 0

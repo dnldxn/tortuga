@@ -40,6 +40,32 @@ const PRESETS := {
 			{"id": 2, "team": 1, "vessel_id": "brig", "position": Vector2(3000, 2100), "heading": 0.0, "role": "practice_target"},
 		],
 	},
+	## Fixed AI duels (plan 03): one team-1 opponent that sails, steers and fights
+	## like the player (role "ship", never practice_target).
+	"duel_sloop": {
+		"player_position": Vector2(2500, 2100),
+		"player_heading": 0.0,
+		"wind_heading": 0.0,
+		"opposition": [
+			{"id": 2, "team": 1, "vessel_id": "sloop", "position": Vector2(3500, 2100), "heading": PI, "role": "ship"},
+		],
+	},
+	"duel_brig": {
+		"player_position": Vector2(3000, 1500),
+		"player_heading": PI / 2.0,
+		"wind_heading": 0.0,
+		"opposition": [
+			{"id": 2, "team": 1, "vessel_id": "brig", "position": Vector2(3000, 2500), "heading": -PI / 2.0, "role": "ship"},
+		],
+	},
+	"duel_frigate": {
+		"player_position": Vector2(2500, 2100),
+		"player_heading": 0.0,
+		"wind_heading": PI / 4.0,
+		"opposition": [
+			{"id": 2, "team": 1, "vessel_id": "frigate", "position": Vector2(3500, 2100), "heading": PI, "role": "ship"},
+		],
+	},
 }
 
 
