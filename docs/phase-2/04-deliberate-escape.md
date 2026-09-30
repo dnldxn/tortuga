@@ -88,9 +88,9 @@ No tuning was needed: all nine routes succeed with the initial constants. Vessel
 AI and arena values are untouched. Per the owner (2026-09-30), escape constants may be
 tuned freely, but any other tuning must go back to the owner with evidence.
 
-## Rendered / owner verification (pending)
+## Rendered / owner verification
 
-Headless runs cannot verify readability or playability. Still to do on a real display:
+Headless runs cannot verify readability or playability. The checklist for a real display:
 
 - Every HUD state and the result/replay flow at 1280×720 and 1920×1080. Check in
   particular that the 520 px top-centre panel does not collide with the corner panels
@@ -105,7 +105,12 @@ Headless runs cannot verify readability or playability. Still to do on a real di
 
 | Build / Godot | Combination(s) | Resolution | Tester / machine | Observations |
 |---|---|---|---|---|
-| — | — | — | — | not yet run |
+| v0.1 plan-04 macOS archive (`93fbcfc`, SHA-256 `3cc1ac1e…ca37797`) / Godot 4.7.2 | Not specified | Not specified | Project owner / Mac (details not specified) | Features validated; individual observations not supplied |
+
+**Owner report, 2026-09-30:** The features were validated on the v0.1 plan-04 macOS
+build. This confirms a native real-display run. The owner did not provide per-combination
+observations, resolutions, machine details, tactics or screenshots, so those fields remain
+open.
 
 This record makes no claim about native runtime, enjoyment or learnability, and does not
 claim Phase 2 completion. Plan 08 keeps the newcomer, packaged-build and performance

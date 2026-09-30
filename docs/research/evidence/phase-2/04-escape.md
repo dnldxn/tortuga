@@ -87,5 +87,6 @@ succeeding setting was kept, giving 9/9. No simulation constants changed.
 
 ## Rendered gameplay
 
-Not yet performed. Repeating the nine tactics with ordinary controls on a real display
-is still owed. Record any differences from the scripted routes here.
+Owner report, 2026-09-30: the features were validated on the v0.1 plan-04 macOS build
+(`93fbcfc`). No details were supplied on which combinations were played, which tactics
+were used, or how play differed from the scripted routes.
