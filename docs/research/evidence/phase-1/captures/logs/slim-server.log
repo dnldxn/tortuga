@@ -1,0 +1,15 @@
+Godot Engine v4.7.2.stable.custom_build.ed1daf0bf - https://godotengine.org
+
+ENV mode=server display=headless renderer=gl_compatibility adapter= vendor= api= window=(0, 0) vsync=1
+SRV listen port=24556 err=0
+SER wall=0 sim=0.00 peers=0 ships[1:h=3.20,x=701]
+SER wall=1 sim=0.00 peers=0 ships[1:h=3.20,x=701]
+SRV join id=1167386514 wall=1.85 peers=1
+SER wall=2 sim=0.17 peers=1 ships[1:h=3.37,x=697 1167386514:h=4.43,x=991]
+SER wall=3 sim=1.17 peers=1 ships[1:h=4.49,x=661 1167386514:h=5.63,x=1027]
+SER wall=4 sim=2.17 peers=1 ships[1:h=5.68,x=703 1167386514:h=0.55,x=1133]
+SER wall=5 sim=3.17 peers=1 ships[1:h=0.56,x=808 1167386514:h=1.75,x=1178]
+SRV leave id=1167386514 wall=5.53 peers=0
+SER wall=6 sim=3.68 peers=0 ships[1:h=1.12,x=848]
+SER wall=7 sim=3.68 peers=0 ships[1:h=1.12,x=848]
+SER wall=8 sim=3.68 peers=0 ships[1:h=1.12,x=848]

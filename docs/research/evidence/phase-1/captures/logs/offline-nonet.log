@@ -1,0 +1,20 @@
+interfaces:
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN mode DEFAULT group default qle
+network unreachable (curl exit 7)
+WARNING: 4 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2536)
+ERROR: 2 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+OpenGL API 4.6 (Core Profile) Mesa 26.1.8 - Compatibility - Using Device: Intel - Mesa Intel(R) UHD Graphics (CML GT2)
+ENV mode=offline display=Wayland renderer=gl_compatibility adapter=Mesa Intel(R) UHD Graphics (CML GT2) vendor=Intel api=4.6 (Core Profile) Mesa 26.1.8 window=(1920, 1080) vsync=1
+OFF wall=1 sim=0.02 peers=0 ships[1000:h=3.22,x=701 1:h=4.25,x=996 2:h=4.81,x=313 3:h=4.74,x=313 4:h=2.78,x=1481]
+T_FIRST_FRAME unix=1790754170.357 engine_ms=1271.6
+OFF wall=2 sim=0.77 peers=0 ships[1000:h=4.12,x=673 1:h=5.05,x=993 2:h=5.71,x=359 3:h=5.64,x=354 4:h=3.40,x=1461]
+OFF wall=3 sim=1.77 peers=0 ships[1000:h=5.32,x=680 1:h=6.24,x=1081 2:h=5.91,x=465 3:h=6.16,x=459 4:h=3.40,x=1433]
+OFF wall=4 sim=2.77 peers=0 ships[1000:h=0.24,x=780 1:h=1.15,x=1172 2:h=5.92,x=572 3:h=6.03,x=566 4:h=3.40,x=1405]
+OFF wall=5 sim=3.77 peers=0 ships[1000:h=1.44,x=852 1:h=2.26,x=1162 2:h=6.11,x=680 3:h=5.13,x=653 4:h=3.40,x=1376]
+OFF wall=6 sim=4.77 peers=0 ships[1000:h=2.64,x=825 1:h=3.17,x=1129 2:h=5.94,x=788 3:h=4.05,x=647 4:h=2.78,x=1350]
+SHOT saved /tmp/opencode/tortuga-phase-1-probe/shot-offline.png
+OFF wall=7 sim=5.38 peers=0 ships[1000:h=3.38,x=808 1:h=3.60,x=1111 2:h=5.67,x=852 3:h=3.32,x=624 4:h=2.28,x=1326]
+OFF wall=8 sim=6.38 peers=0 ships[1000:h=4.58,x=774 1:h=4.03,x=1070 2:h=4.97,x=920 3:h=2.13,x=591 4:h=1.69,x=1297]

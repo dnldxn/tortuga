@@ -1,0 +1,57 @@
+START 2026-09-30T07:30:21Z
+ 00:30:21 up  2:34,  2 users,  load average: 0.57, 1.03, 0.91
+RUN normal-1 scene=normal launch_to_first_frame_ms=943
+OpenGL API 4.6 (Core Profile) Mesa 26.1.8 - Compatibility - Using Device: Intel - Mesa Intel(R) UHD Graphics (CML GT2)
+BENCH frames=72432 mean_ms=0.828 median_ms=0.775 p95_ms=1.283 p99_ms=1.434 max_ms=3.398 over_16.67ms=0
+T_RELOAD_MS 12.16
+T_RELOAD_MS 12.62
+T_RELOAD_MS 11.24
+T_RELOAD_MS 11.24
+T_RELOAD_MS 12.76
+RSS_kB samples=71 mean=163006 peak=166340
+RUN normal-2 scene=normal launch_to_first_frame_ms=1493
+OpenGL API 4.6 (Core Profile) Mesa 26.1.8 - Compatibility - Using Device: Intel - Mesa Intel(R) UHD Graphics (CML GT2)
+BENCH frames=70938 mean_ms=0.846 median_ms=0.779 p95_ms=1.320 p99_ms=1.542 max_ms=2.923 over_16.67ms=0
+T_RELOAD_MS 11.92
+T_RELOAD_MS 11.10
+T_RELOAD_MS 11.17
+T_RELOAD_MS 11.29
+T_RELOAD_MS 11.20
+RSS_kB samples=72 mean=161663 peak=166360
+RUN normal-3 scene=normal launch_to_first_frame_ms=1112
+OpenGL API 4.6 (Core Profile) Mesa 26.1.8 - Compatibility - Using Device: Intel - Mesa Intel(R) UHD Graphics (CML GT2)
+BENCH frames=71152 mean_ms=0.843 median_ms=0.779 p95_ms=1.313 p99_ms=1.526 max_ms=3.674 over_16.67ms=0
+T_RELOAD_MS 12.18
+T_RELOAD_MS 11.04
+T_RELOAD_MS 11.07
+T_RELOAD_MS 11.20
+T_RELOAD_MS 14.96
+RSS_kB samples=72 mean=162853 peak=166748
+RUN busy-1 scene=busy launch_to_first_frame_ms=1340
+OpenGL API 4.6 (Core Profile) Mesa 26.1.8 - Compatibility - Using Device: Intel - Mesa Intel(R) UHD Graphics (CML GT2)
+BENCH frames=37446 mean_ms=1.602 median_ms=1.205 p95_ms=3.057 p99_ms=3.638 max_ms=5.170 over_16.67ms=0
+T_RELOAD_MS 12.03
+T_RELOAD_MS 11.13
+T_RELOAD_MS 11.01
+T_RELOAD_MS 11.28
+T_RELOAD_MS 11.20
+RSS_kB samples=71 mean=162415 peak=166148
+RUN busy-2 scene=busy launch_to_first_frame_ms=1322
+OpenGL API 4.6 (Core Profile) Mesa 26.1.8 - Compatibility - Using Device: Intel - Mesa Intel(R) UHD Graphics (CML GT2)
+BENCH frames=37650 mean_ms=1.594 median_ms=1.212 p95_ms=3.052 p99_ms=3.696 max_ms=5.102 over_16.67ms=0
+T_RELOAD_MS 29.47
+T_RELOAD_MS 11.38
+T_RELOAD_MS 11.12
+T_RELOAD_MS 26.72
+T_RELOAD_MS 17.78
+RSS_kB samples=71 mean=162724 peak=166524
+RUN busy-3 scene=busy launch_to_first_frame_ms=1482
+OpenGL API 4.6 (Core Profile) Mesa 26.1.8 - Compatibility - Using Device: Intel - Mesa Intel(R) UHD Graphics (CML GT2)
+BENCH frames=37328 mean_ms=1.607 median_ms=1.211 p95_ms=3.030 p99_ms=3.621 max_ms=4.948 over_16.67ms=0
+T_RELOAD_MS 12.86
+T_RELOAD_MS 12.88
+T_RELOAD_MS 11.41
+T_RELOAD_MS 11.31
+T_RELOAD_MS 25.45
+RSS_kB samples=72 mean=162133 peak=166484
+END 2026-09-30T07:37:33Z

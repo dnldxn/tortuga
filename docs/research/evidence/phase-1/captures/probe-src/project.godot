@@ -1,0 +1,24 @@
+; Tortuga Phase 1 feasibility probe. Disposable; not the game.
+config_version=5
+
+[application]
+
+config/name="tortuga-probe"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+run/max_fps=0
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true

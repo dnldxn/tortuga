@@ -108,7 +108,7 @@ Before starting each phase, create its detailed plan covering the player outcome
 
 **Purpose:** Establish what Tortuga must preserve and what it should change before implementation begins.
 
-**Detailed research brief:** [Phase 1: Research and direction — specification #1](https://github.com/dnldxn/tortuga/issues/1). The brief is approved; research findings and technical feasibility measurements are pending.
+**Detailed research brief:** [Phase 1: Research and direction — specification #1](https://github.com/dnldxn/tortuga/issues/1). **Status: accepted by the owner on 2026-09-30.** Findings, measurements, approved budgets, and the decision/risk register are in the [Phase 1 research dossier](docs/research/phase-1.md). Selected: Godot 4.7.2 with the Compatibility renderer; northern Leeward Islands c. 1660–1680; top-down 2D presentation. Carried into Phase 2 as gates: native runs on Windows and macOS, and a frame-time check on a real display.
 
 **Scope:** Expand the reference research with observed play, map the main systems and their relationships, and make a preserve/modernize/defer assessment. Define the initial naval play area and art direction at a scope appropriate for one owner. Evaluate development tools and cross-platform feasibility. Resolve enough of the multiplayer session model—independent captains, intended group size, world time, encounters, and ownership—to avoid building an incompatible offline foundation. Establish an asset sourcing and production approach for Tortuga's own presentation.
 
@@ -314,6 +314,21 @@ Other ideas remain in an evaluated backlog. They do not enter the roadmap simply
 - **Human verification:** AI-generated work still requires observed play, integration checks, and human judgment about whether the game is enjoyable.
 - **Scope discipline:** Each phase adds one principal capability. Foundational work stays proportionate to the next playable milestone; later content and optional systems wait for demonstrated need.
 
+#### Testing environment and headless validation
+
+The current Linux development machine can support substantial automated testing without a full desktop environment. Its initial capability check found no active X11/Wayland display session, Intel UHD integrated graphics (CometLake-H GT2), and an NVIDIA RTX 2070. `vulkaninfo --summary` enumerated both GPUs, and `eglinfo -B` successfully created hardware-backed OpenGL contexts on both through EGL device access; NVIDIA surfaceless rendering was also available. These are graphics-stack findings, not proof that a selected game engine or Tortuga build renders correctly or meets performance targets. Recheck the environment and active renderer before future measurements.
+
+| Validation area | Approach and limits |
+|---|---|
+| Simulation and server behavior | Run automated combat-rule, AI, save/load, connection, disconnect, and pause-when-empty checks without graphics as those systems become available. |
+| Graphics and interface | Validate the selected engine's offscreen rendering or minimal virtual-display path, then capture frames and exercise scripted input. An engine's headless mode may disable rendering entirely; logic-only runs do not validate visuals. A full desktop is not inherently required. |
+| Performance and loading | Explicitly select and record the Intel hardware renderer for the integrated-graphics baseline, with resolution, drivers, power mode, and workload. RTX 2070 results and CPU-based `llvmpipe` results are separate measurements, not substitutes. Offscreen timing does not fully validate display presentation, VSync, or input-to-display latency. |
+| Packaging and resources | Measure download/installed sizes, required dependencies, CPU, and memory; measure graphical startup and loading only through a verified rendering path. |
+| Desktop and human validation | Use real desktop sessions for fullscreen/focus, display scaling, controllers, audio experience, and human judgments of responsiveness and enjoyment. |
+| Platform coverage | Linux and macOS testing access is available; Mac runs are user-assisted until another access method is established. Windows runtime access remains unresolved. Cross-compilation or a successful package export does not satisfy native runtime verification on any platform. |
+
+Phase 1 should establish the minimal engine-compatible rendering setup rather than assume a full desktop installation is needed. Xorg and capture tools were present at the initial check; Xvfb was absent. Any virtual-display or offscreen setup must identify whether it uses hardware acceleration or software rendering. These host findings inform the feasibility probes; Phase 2 still requires runnable verification on Windows, macOS, and Linux, together with human playtests.
+
 ### 6. Main risks and responses
 
 | Risk | Roadmap response |
@@ -350,12 +365,12 @@ These are deliberately deferred decisions with an owning phase. Resolve each bef
 
 | Decision | Owning phase / latest resolution point |
 |---|---|
-| Which initial Caribbean region and bounded historical period within the README's Golden Age of Piracy setting best fit the compact adventure? | Phase 1; refine geography for Phase 5. |
-| Which engine, tools, and asset approach meet the solo workflow and three-platform target? | Phase 1, supported by feasibility work. |
-| What are the minimum hardware, OS, and initial input targets? | Phase 1 direction; explicit Phase 2 verification criteria. |
-| What frame-time, memory, loading-time, download-size, and installed-size budgets define highly performant, extremely fast-loading, and tiny on the target hardware? | Phase 1; verify from Phase 2 onward and revisit explicitly when scope changes. |
-| What server operating requirements and participant persistence support the agreed dedicated-server, 2–4-captain envelope? | Phase 1 feasibility; finalize session rules for Phase 3. |
-| How do shared time, independent movement, encounter boundaries, and campaign ownership work? | Phase 1 constraints; finalize and validate in Phase 5. |
+| ~~Which initial Caribbean region and bounded historical period fit the compact adventure?~~ Resolved in Phase 1: northern Leeward Islands, c. 1660–1680. | Verify historical island ownership and refine geography for Phase 5. |
+| ~~Which engine, tools, and asset approach meet the solo workflow and three-platform target?~~ Resolved in Phase 1: Godot 4.7.2, top-down 2D sprites, CC0 or original assets. | Windows and macOS runtime still unverified; Phase 2 gate. |
+| What are the minimum hardware, OS, and initial input targets? | Hardware floor set in Phase 1: a 2020-class Intel UHD laptop at 1080p. OS versions, a Mac baseline, and input devices remain for Phase 2 verification. |
+| ~~What frame-time, memory, loading-time, download-size, and installed-size budgets apply?~~ Resolved in Phase 1: see the approved budgets table in the dossier. | Verify from Phase 2 onward and revisit explicitly when scope changes. |
+| What server operating requirements and participant persistence support the agreed dedicated-server, 2–4-captain envelope? | Phase 1 found a Linux headless server feasible at under 100 MB for 4 clients; persistence was not exercised. Finalize session rules for Phase 3. |
+| How do shared time, independent movement, encounter boundaries, and campaign ownership work? | Phase 1 constraints recorded in the dossier; finalize and validate in Phase 5. |
 | What happens when a participant disconnects or the dedicated server stops, and what is required of reconnect/resume? | Phase 3 session rules; Phase 5 persistent-world rules. |
 | Can an offline campaign later become multiplayer, or move between servers? | Phase 5; offline and multiplayer support alone does not promise save conversion. |
 | What are the port safety, campaign PvP consent, loot-sharing, and loss/recovery rules? | Phase 6 for port safety; Phase 7 for prizes and player property. |
@@ -366,4 +381,4 @@ These are deliberately deferred decisions with an owning phase. Resolve each bef
 | How should duels and treasure discoveries handle uninvolved or competing players? | Phases 14 and 15 respectively. |
 | What release audience, distribution approach, budget, and presentation bar are realistic? | Establish production assumptions in Phase 1; revisit before Phase 16 expansion and Phase 17 release planning. |
 
-**Next step:** use the approved [Phase 1 research brief](https://github.com/dnldxn/tortuga/issues/1) to plan and execute the bounded research and feasibility work. Phase 1 closes only after its deliverables and budgets are accepted; this master plan does not authorize immediate implementation of every listed feature.
+**Next step:** Phase 1 is accepted. Write the Phase 2 specification and implementation plan for the offline naval MVP from the brief in the [dossier](docs/research/phase-1.md). This master plan does not authorize immediate implementation of every listed feature.

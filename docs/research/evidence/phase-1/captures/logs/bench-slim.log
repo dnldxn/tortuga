@@ -1,0 +1,9 @@
+RUN slim-busy-1 scene=busy launch_to_first_frame_ms=1354
+OpenGL API 4.6 (Core Profile) Mesa 26.1.8 - Compatibility - Using Device: Intel - Mesa Intel(R) UHD Graphics (CML GT2)
+BENCH frames=29231 mean_ms=2.053 median_ms=1.596 p95_ms=3.992 p99_ms=4.515 max_ms=6.790 over_16.67ms=0
+T_RELOAD_MS 13.93
+T_RELOAD_MS 29.95
+T_RELOAD_MS 12.28
+T_RELOAD_MS 27.78
+T_RELOAD_MS 14.46
+RSS_kB samples=71 mean=126486 peak=129296

@@ -1,0 +1,96 @@
+run_id,utc_date,machine,gpu_renderer,build,workload,metric,value,unit,samples,notes
+normal-1,2026-09-30,LNX-01,Intel UHD CML GT2 / Mesa 26.1.8 / OpenGL 4.6 Compatibility,godot-4.7.2 linux release 5518d8cc,normal scene 1920x1080 vsync off,frame_time_mean,0.828,ms,72432,60 s after 5 s warm-up
+normal-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_median,0.775,ms,72432,
+normal-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_p95,1.283,ms,72432,
+normal-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_p99,1.434,ms,72432,
+normal-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_max,3.398,ms,72432,
+normal-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frames_over_16.67ms,0,count,72432,
+normal-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,rss_mean,163006,kB,71,VmRSS sampled at 1 Hz over the whole process life
+normal-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,rss_peak,166340,kB,71,
+normal-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,reload_to_frame,12.16;12.62;11.24;11.24;12.76,ms,5,scene proxy: free view and world then rebuild then next drawn frame; textures stay cached
+normal-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_mean,0.846,ms,70938,
+normal-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_median,0.779,ms,70938,
+normal-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_p95,1.320,ms,70938,
+normal-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_p99,1.542,ms,70938,
+normal-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_max,2.923,ms,70938,
+normal-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frames_over_16.67ms,0,count,70938,
+normal-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,rss_mean,161663,kB,72,
+normal-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,rss_peak,166360,kB,72,
+normal-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,reload_to_frame,11.92;11.10;11.17;11.29;11.20,ms,5,scene proxy
+normal-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_mean,0.843,ms,71152,
+normal-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_median,0.779,ms,71152,
+normal-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_p95,1.313,ms,71152,
+normal-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_p99,1.526,ms,71152,
+normal-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frame_time_max,3.674,ms,71152,
+normal-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,frames_over_16.67ms,0,count,71152,
+normal-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,rss_mean,162853,kB,72,
+normal-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,rss_peak,166748,kB,72,
+normal-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,normal scene,reload_to_frame,12.18;11.04;11.07;11.20;14.96,ms,5,scene proxy
+busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene 1920x1080 vsync off,frame_time_mean,1.602,ms,37446,60 s after 5 s warm-up
+busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_median,1.205,ms,37446,
+busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_p95,3.057,ms,37446,
+busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_p99,3.638,ms,37446,
+busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_max,5.170,ms,37446,
+busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frames_over_16.67ms,0,count,37446,
+busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,rss_mean,162415,kB,71,
+busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,rss_peak,166148,kB,71,
+busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,reload_to_frame,12.03;11.13;11.01;11.28;11.20,ms,5,scene proxy
+busy-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_mean,1.594,ms,37650,
+busy-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_median,1.212,ms,37650,
+busy-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_p95,3.052,ms,37650,
+busy-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_p99,3.696,ms,37650,
+busy-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_max,5.102,ms,37650,
+busy-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frames_over_16.67ms,0,count,37650,
+busy-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,rss_mean,162724,kB,71,
+busy-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,rss_peak,166524,kB,71,
+busy-2,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,reload_to_frame,29.47;11.38;11.12;26.72;17.78,ms,5,scene proxy; slower samples kept
+busy-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_mean,1.607,ms,37328,
+busy-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_median,1.211,ms,37328,
+busy-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_p95,3.030,ms,37328,
+busy-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_p99,3.621,ms,37328,
+busy-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frame_time_max,4.948,ms,37328,
+busy-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,frames_over_16.67ms,0,count,37328,
+busy-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,rss_mean,162133,kB,72,
+busy-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,rss_peak,166484,kB,72,
+busy-3,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,busy scene,reload_to_frame,12.86;12.88;11.41;11.31;25.45,ms,5,scene proxy; slower sample kept
+bench-launch,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,launch from tmpfs,launch_to_first_frame,943;1493;1112;1340;1322;1482,ms,6,binary on RAM-backed /tmp; one per bench run
+startup-warm,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,launch from NVMe Btrfs,launch_to_first_frame,1207;1335;1386;1159;1139,ms,5,nothing evicted; median 1207
+startup-cold,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,launch from NVMe Btrfs,launch_to_first_frame,1423;1289;1337;1168;1427,ms,5,binary evicted with posix_fadvise DONTNEED; system libraries still cached; median 1337
+startup-first,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 linux release 5518d8cc,launch from NVMe Btrfs,launch_to_first_frame,2681;2651;2691;2639;2548,ms,5,binary evicted plus app user dir and shader caches wiped; median 2651
+startup-headless,2026-09-30,LNX-01,none,godot-4.7.2 linux release 5518d8cc,headless start then quit at 0.1 s,process_wall_time,495,ms,1,diagnostic only
+size-linux,2026-09-30,n/a,n/a,godot-4.7.2 linux release 5518d8cc,client package,installed_bytes,74108424,bytes,1,single executable with embedded 0.59 MB pack; stock template alone is 73519416
+size-linux,2026-09-30,n/a,n/a,godot-4.7.2 linux release 5518d8cc,client package,zip9_bytes,28817011,bytes,1,
+size-linux,2026-09-30,n/a,n/a,godot-4.7.2 linux release 5518d8cc,client package,7z9_bytes,16800776,bytes,1,
+size-windows,2026-09-30,n/a,n/a,godot-4.7.2 windows release ca8cda54,client package,installed_bytes,109716696,bytes,1,export only; never run; stock template alone is 109268480
+size-windows,2026-09-30,n/a,n/a,godot-4.7.2 windows release ca8cda54,client package,zip9_bytes,38342905,bytes,1,
+size-windows,2026-09-30,n/a,n/a,godot-4.7.2 windows release ca8cda54,client package,7z9_bytes,22711584,bytes,1,
+size-macos,2026-09-30,n/a,n/a,godot-4.7.2 macos universal release 952e0201,client package,installed_bytes,171625349,bytes,1,export only; never run; universal x86_64 plus arm64; ad-hoc signed and not notarized
+size-macos,2026-09-30,n/a,n/a,godot-4.7.2 macos universal release 952e0201,client package,zip_bytes,60965923,bytes,1,zip as written by the exporter
+size-pack,2026-09-30,n/a,n/a,godot-4.7.2,game data pack,pck_bytes,589112,bytes,1,from the macOS bundle; source assets 702967 bytes
+size-server,2026-09-30,n/a,n/a,godot-4.7.2 linux dedicated server 5094c4d7,server package,installed_bytes,74108472,bytes,1,same stock template as the client; textures stripped to placeholders
+size-server,2026-09-30,n/a,n/a,godot-4.7.2 linux dedicated server 5094c4d7,server package,zip9_bytes,28817055,bytes,1,
+size-server,2026-09-30,n/a,n/a,godot-4.7.2 linux dedicated server 5094c4d7,server package,7z9_bytes,16800821,bytes,1,
+net-1,2026-09-30,LNX-01,none (DISPLAY and WAYLAND_DISPLAY unset),godot-4.7.2 linux dedicated server 5094c4d7,0 clients at start,server_cpu,1.6,% of one core,4,clients ran on the same host
+net-1,2026-09-30,LNX-01,none,godot-4.7.2 linux dedicated server 5094c4d7,2 clients,server_cpu,2.9,% of one core,8,
+net-1,2026-09-30,LNX-01,none,godot-4.7.2 linux dedicated server 5094c4d7,4 clients,server_cpu,3.1,% of one core,8,
+net-1,2026-09-30,LNX-01,none,godot-4.7.2 linux dedicated server 5094c4d7,0 clients paused,server_cpu,1.8;1.9,% of one core,9;13,two empty intervals
+net-1,2026-09-30,LNX-01,none,godot-4.7.2 linux dedicated server 5094c4d7,whole run,server_rss_peak,79636,kB,79,range 79252 to 79636 after start-up
+net-1,2026-09-30,LNX-01,none,godot-4.7.2 linux dedicated server 5094c4d7,client quits normally,leave_detection_delay,<0.1,s,3,clients C D F
+net-1,2026-09-30,LNX-01,none,godot-4.7.2 linux dedicated server 5094c4d7,client SIGTERM,leave_detection_delay,7.5;9.5,s,2,clients A B; timeline clock versus server clock so about +/-0.3 s
+net-1,2026-09-30,LNX-01,none,godot-4.7.2 linux dedicated server 5094c4d7,client SIGKILL,leave_detection_delay,5.4,s,1,client E
+net-1,2026-09-30,LNX-01,none,godot-4.7.2 linux dedicated server 5094c4d7,empty intervals,sim_time_advance_while_empty,0;0;0;0,s,4,wall 0-5 40-50 66-80 86-95; AI ship position also unchanged
+size-linux-slim,2026-09-30,n/a,n/a,godot-4.7.2 custom 2D-only size-optimised template f610ce77,client package,installed_bytes,28474984,bytes,1,template alone 27885968 stripped; links system libstdc++ dynamically
+size-linux-slim,2026-09-30,n/a,n/a,godot-4.7.2 custom template f610ce77,client package,zip9_bytes,11145115,bytes,1,
+size-linux-slim,2026-09-30,n/a,n/a,godot-4.7.2 custom template f610ce77,client package,7z9_bytes,6804947,bytes,1,
+slim-busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,busy scene 1920x1080 vsync off,frame_time_mean,2.053,ms,29231,60 s after 5 s warm-up; single run
+slim-busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,busy scene,frame_time_median,1.596,ms,29231,
+slim-busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,busy scene,frame_time_p95,3.992,ms,29231,
+slim-busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,busy scene,frame_time_p99,4.515,ms,29231,
+slim-busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,busy scene,frame_time_max,6.790,ms,29231,
+slim-busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,busy scene,frames_over_16.67ms,0,count,29231,
+slim-busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,busy scene,rss_mean,126486,kB,71,
+slim-busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,busy scene,rss_peak,129296,kB,71,
+slim-busy-1,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,busy scene,reload_to_frame,13.93;29.95;12.28;27.78;14.46,ms,5,scene proxy
+slim-startup-warm,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,launch from NVMe Btrfs,launch_to_first_frame,1175;1430;1384;1130;1249,ms,5,median 1249
+slim-startup-cold,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,launch from NVMe Btrfs,launch_to_first_frame,1437;1249;1193;1213;1396,ms,5,median 1249
+slim-startup-first,2026-09-30,LNX-01,Intel UHD CML GT2,godot-4.7.2 custom template f610ce77,launch from NVMe Btrfs,launch_to_first_frame,2857;2744;2593;2596;2442,ms,5,median 2596

@@ -1,0 +1,11 @@
+.00508 server started pid=66376 DISPLAY=unset WAYLAND_DISPLAY=unset
+5.0126 start client A bot=-1 pid=66485
+5.0156 start client B bot=1 pid=66493
+15.023 start client C bot=0 pid=66645
+15.031 start client D bot=0.5 pid=66653
+15.038 C and D will quit themselves 10 s after launch
+30.047 SIGTERM A B
+50.057 start client E bot=1 pid=67151
+60.068 SIGKILL E (connection loss)
+80.080 start client F bot=-1 pid=67609
+90.091 server quits itself at 95 s of its own clock
