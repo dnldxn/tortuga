@@ -1,13 +1,14 @@
 extends Control
-## Read-only HUD: four compact corner panels (own ship, enemies, port and starboard
-## broadsides) so the arena centre stays clear. Help text lives in the pause menu.
+## Read-only HUD: wind, two fixed-ID enemy rows, player tracks and independent side cards.
+## Help text lives in the pause menu.
 ## Feedback ages in physics ticks.
 
 const Definitions := preload("res://sim/definitions.gd")
 const NavalSimulation := preload("res://sim/naval_simulation.gd")
+const Presentation := preload("res://view/combat_presentation.gd")
+const Bindings := preload("res://input_bindings.gd")
 
 const COMPASS := ["E", "SE", "S", "SW", "W", "NW", "N", "NE"]
-const AIM_TEXT := {"assisted": "assisted", "outside_arc": "outside arc", "out_of_range": "out of range", "no_active_enemy": "no active enemy"}
 const STATS := ["hull", "sails", "crew"]
 const MARGIN := 12
 const ICONS := {
@@ -31,9 +32,15 @@ var second_target_state_label: Label
 var second_target_stats := {}
 var defeated_notice: Label
 var side_labels := {}  # side -> header Label
+var ammo_labels := {}
 var gun_bars := {}  # side -> Array[ProgressBar], prebuilt for the largest vessel
 var aim_labels := {}
+var aim_icons := {}
 var feedback_labels := {}
+var _last_ammo := {}
+var _ammo_notice := {}  # side -> ticks remaining after a real ammo change
+var crew_notice: Label
+var practice_notice: Label
 var _feedback := {}  # side -> remaining physics ticks
 var escape_panel: PanelContainer
 var escape_rule_label: Label
@@ -48,8 +55,10 @@ func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 	var status := _corner(PRESET_TOP_LEFT)
 	name_label = _label(status)
+	var player_panel := _corner(PRESET_BOTTOM_LEFT)
 	for stat in STATS:
-		ship_stats[stat] = _stat_row(status, stat)
+		ship_stats[stat] = _stat_row(player_panel, stat)
+	crew_notice = _label(player_panel)
 	var motion := _row(status)
 	_icon(motion, "speed")
 	speed_label = _label(motion)
@@ -59,10 +68,12 @@ func _ready() -> void:
 	wind_arrow.draw.connect(_draw_wind_arrow)
 	motion.add_child(wind_arrow)
 	wind_label = _label(motion)
+	practice_notice = _label(status)
 	var target := _corner(PRESET_TOP_RIGHT)
 	target_label = _label(target)
+	var first_stats := _row(target)
 	for stat in STATS:
-		target_stats[stat] = _stat_row(target, stat)
+		target_stats[stat] = _stat_row(first_stats, stat, true)
 	var where := _row(target)
 	_icon(where, "distance")
 	target_state_label = _label(where)
@@ -70,8 +81,9 @@ func _ready() -> void:
 	second_target_block.add_theme_constant_override("separation", 2)
 	target.add_child(second_target_block)
 	second_target_label = _label(second_target_block)
+	var second_stats := _row(second_target_block)
 	for stat in STATS:
-		second_target_stats[stat] = _stat_row(second_target_block, stat)
+		second_target_stats[stat] = _stat_row(second_stats, stat, true)
 	var second_where := _row(second_target_block)
 	_icon(second_where, "distance")
 	second_target_state_label = _label(second_where)
@@ -80,7 +92,12 @@ func _ready() -> void:
 	for vessel in Definitions.VESSELS.values():
 		max_guns = maxi(max_guns, vessel["guns_per_side"])
 	for side in Definitions.SIDES:
-		_make_side(_corner(PRESET_BOTTOM_LEFT if side == "port" else PRESET_BOTTOM_RIGHT), side, max_guns)
+		var side_box := _corner(PRESET_BOTTOM_LEFT if side == "port" else PRESET_BOTTOM_RIGHT)
+		if side == "port":
+			var panel: Control = side_box.get_parent()
+			panel.offset_left += 310
+			panel.offset_right += 310
+		_make_side(side_box, side, max_guns)
 	_make_escape()
 
 
@@ -99,22 +116,36 @@ func _make_escape() -> void:
 	for label in [escape_rule_label, escape_status_label]:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.custom_minimum_size.x = 520  # fits between the top corner panels at 1280 wide
-	escape_bar = _bar(box, Vector2(520, 10))
+		label.custom_minimum_size.x = 340  # leaves the two-enemy rows unobstructed at 720p
+	escape_bar = _bar(box, Vector2(340, 10))
 
 
 func _make_side(parent: Node, side: String, max_guns: int) -> void:
 	var header := _row(parent)
 	_icon(header, "cannon")
 	side_labels[side] = _label(header)
+	ammo_labels[side] = _label(parent)
+	ammo_labels[side].add_theme_font_size_override("font_size", 16)
 	var guns := _row(parent)
 	guns.add_theme_constant_override("separation", 4)
 	gun_bars[side] = []
 	for i in max_guns:
 		var bar := _bar(guns, Vector2(12, 22))
 		bar.fill_mode = ProgressBar.FILL_BOTTOM_TO_TOP
+		var pip := Label.new()
+		pip.add_theme_font_size_override("font_size", 16)
+		pip.mouse_filter = MOUSE_FILTER_IGNORE
+		bar.add_child(pip)
 		gun_bars[side].append(bar)
-	aim_labels[side] = _label(parent)
+	var aim_row := _row(parent)
+	aim_labels[side] = _label(aim_row)
+	aim_labels[side].add_theme_font_size_override("font_size", 16)
+	var icon := Control.new()
+	icon.custom_minimum_size = Vector2(24, 24)
+	icon.mouse_filter = MOUSE_FILTER_IGNORE
+	icon.draw.connect(_draw_aim_icon.bind(side))
+	aim_row.add_child(icon)
+	aim_icons[side] = icon
 	feedback_labels[side] = _label(parent)
 	feedback_labels[side].add_theme_color_override("font_color", Color(1.0, 0.55, 0.45))
 	feedback_labels[side].visible = false
@@ -122,6 +153,8 @@ func _make_side(parent: Node, side: String, max_guns: int) -> void:
 
 func reset_effects() -> void:
 	_feedback.clear()
+	_last_ammo.clear()
+	_ammo_notice.clear()
 	_escape_prev_ticks = 0
 	_escape_reset_notice = false
 	for label in feedback_labels.values():
@@ -131,9 +164,9 @@ func reset_effects() -> void:
 
 func consume_events(events: Array) -> void:
 	for event in events:
-		if event["type"] == "fire_rejected" and event["ship_id"] == 1:
-			_feedback[event["side"]] = 90
-		elif event["type"] == "shot" and event["ship_id"] == 1:
+		if event["type"] == "empty" and event["ship_id"] == 1:
+			_feedback[event["side"]] = 48
+		elif event["type"] == "volley" and event["ship_id"] == 1:
 			_feedback.erase(event["side"])
 
 
@@ -142,6 +175,10 @@ func advance_effects() -> void:
 		_feedback[side] -= 1
 		if _feedback[side] <= 0:
 			_feedback.erase(side)
+	for side in _ammo_notice.keys():
+		_ammo_notice[side] -= 1
+		if _ammo_notice[side] <= 0:
+			_ammo_notice.erase(side)
 
 
 func refresh(sim) -> void:
@@ -151,11 +188,13 @@ func refresh(sim) -> void:
 	var vessel: Dictionary = Definitions.VESSELS[ship["vessel_id"]]
 	name_label.text = "%s · %s" % [vessel["display_name"], "REEFED" if ship["reefed"] else "FULL SAILS"]
 	_set_stats(ship_stats, ship, vessel)
+	crew_notice.text = "Crew losses slow reload" if ship["crew"] < vessel["crew"] else ""
 	speed_label.text = "%d" % roundi(ship["speed"])
 	var sector := posmod(roundi(sim.wind_heading / (PI / 4.0)), 8)
-	wind_label.text = "Wind %s" % COMPASS[sector]
+	wind_label.text = "Wind %s →" % COMPASS[sector]
 	wind_heading = sim.wind_heading
 	wind_arrow.queue_redraw()
+	practice_notice.text = "Aim assist — shots can miss" if sim.preset_id == "practice" else ""
 	var target: Dictionary = sim.ships.get(2, {})
 	panels[1].visible = not target.is_empty()
 	second_target_block.visible = sim.ships.has(3)
@@ -168,15 +207,15 @@ func refresh(sim) -> void:
 		defeated_notice.text = ""
 	if not target.is_empty():
 		var target_vessel: Dictionary = Definitions.VESSELS[target["vessel_id"]]
-		target_label.text = "Sloop A" if sim.ships.has(3) else ("Enemy A (%s)" % target_vessel["display_name"] if sim.preset_id != "practice" else "TARGET · Brig")
+		target_label.text = "TARGET · Brig" if sim.preset_id == "practice" else Presentation.ship_label(sim, 2)
 		_set_stats(target_stats, target, target_vessel)
 		var distance := roundi(target["position"].distance_to(ship["position"]))
 		var state := "Active" if target["active"] else ("SUNK" if "sunk" in target["defeat_reasons"] else "DISABLED · " + " · ".join(target["defeat_reasons"]).to_upper())
 		target_state_label.text = "%d · %s" % [distance, state]
 	if second_target_block.visible:
 		var second: Dictionary = sim.ships[3]
-		second_target_label.text = "◆ Sloop B"
-		target_label.text = "▲ Sloop A"
+		second_target_label.text = "◆ " + Presentation.ship_label(sim, 3)
+		target_label.text = "▲ " + Presentation.ship_label(sim, 2)
 		_set_stats(second_target_stats, second, Definitions.VESSELS[second["vessel_id"]])
 		var second_state := "Active" if second["active"] else ("SUNK" if "sunk" in second["defeat_reasons"] else "DISABLED · " + " · ".join(second["defeat_reasons"]).to_upper())
 		second_target_state_label.text = "%d · %s" % [roundi(second["position"].distance_to(ship["position"])), second_state]
@@ -192,13 +231,23 @@ func refresh(sim) -> void:
 			if i < loads.size():
 				# Only a fully loaded gun reads 100; a nearly loaded one caps at 99.
 				bars[i].value = 100 if loads[i] == 1.0 else mini(99, roundi(loads[i] * 100.0))
-		side_labels[side].text = "%s · %s · %d/%d ready" % [
-			side.capitalize(), Definitions.AMMO[weapon["ammo"]]["display_name"], ready, loads.size()]
+				bars[i].get_child(0).text = "●" if loads[i] == 1.0 else ("◑" if loads[i] > 0.0 else "○")
+		var ammo: Dictionary = Definitions.AMMO[weapon["ammo"]]
+		if _last_ammo.has(side) and _last_ammo[side] != weapon["ammo"]:
+			_ammo_notice[side] = 48
+		_last_ammo[side] = weapon["ammo"]
+		var glyph: String = {"round": "●", "chain": "○—○", "grape": "∴"}[weapon["ammo"]]
+		side_labels[side].text = "%s · %s · %d/%d ready" % [side.capitalize(), ammo["display_name"], ready, loads.size()]
+		ammo_labels[side].text = "%s fire · %s cycle | %s %s → %s" % [
+			Bindings.binding_label("fire_" + side), Bindings.binding_label("cycle_" + side),
+			glyph, ammo["display_name"], ammo["track"].capitalize()]
+		if _ammo_notice.has(side):
+			ammo_labels[side].text += " · LOAD RESET"
 		var aim: Dictionary = sim.aim_for(sim.PLAYER_ID, side)
-		var aim_text: String = AIM_TEXT[aim["reason"]]
-		if aim["target_id"] != null:
-			aim_text = "Sloop %s · assisted" % ("A" if aim["target_id"] == 2 else "B") if sim.ships.has(3) else "target %d · assisted" % aim["target_id"]
-		aim_labels[side].text = "Range %d · %s" % [roundi(aim["range"]), aim_text]
+		var target_name: String = Presentation.ship_label(sim, aim["target_id"]) if aim["target_id"] != null else ""
+		aim_labels[side].text = "Range %d · %s" % [roundi(aim["range"]), Presentation.aim_label(ready, aim["reason"], target_name)]
+		aim_icons[side].set_meta("status", "empty" if ready == 0 else aim["reason"])
+		aim_icons[side].queue_redraw()
 		feedback_labels[side].text = "no loaded guns" if _feedback.has(side) else ""
 		feedback_labels[side].visible = _feedback.has(side)
 	_refresh_escape(sim, ship)
@@ -262,6 +311,24 @@ func _draw_wind_arrow() -> void:
 	wind_arrow.draw_colored_polygon(PackedVector2Array([c + dir * 13, c + dir * 3 + side * 6, c + dir * 3 - side * 6]), Color.WHITE)
 
 
+func _draw_aim_icon(side: String) -> void:
+	var icon: Control = aim_icons[side]
+	match icon.get_meta("status", "assisted"):
+		"empty", "no_active_enemy":
+			icon.draw_arc(Vector2(12, 12), 8, 0, TAU, 24, Color.WHITE, 2)
+		"out_of_range":
+			for x in [3.0, 21.0]:
+				icon.draw_line(Vector2(x, 4), Vector2(x, 20), Color.WHITE, 2)
+			icon.draw_line(Vector2(5, 12), Vector2(19, 12), Color.WHITE, 2)
+		"outside_arc":
+			icon.draw_arc(Vector2(12, 12), 8, -PI * .85, PI * .55, 20, Color.WHITE, 2)
+			icon.draw_colored_polygon(PackedVector2Array([Vector2(17, 5), Vector2(23, 7), Vector2(18, 12)]), Color.WHITE)
+		"assisted":
+			icon.draw_line(Vector2(3, 12), Vector2(21, 12), Color.WHITE, 2)
+			icon.draw_line(Vector2(15, 6), Vector2(21, 12), Color.WHITE, 2)
+			icon.draw_line(Vector2(15, 18), Vector2(21, 12), Color.WHITE, 2)
+
+
 ## A panel pinned to one screen corner, growing inward as its content grows.
 func _corner(preset: LayoutPreset) -> VBoxContainer:
 	var panel := PanelContainer.new()
@@ -277,12 +344,19 @@ func _corner(preset: LayoutPreset) -> VBoxContainer:
 	return box
 
 
-func _stat_row(parent: Node, stat: String) -> Array:
+func _stat_row(parent: Node, stat: String, compact := false) -> Array:
 	var row := _row(parent)
-	_icon(row, stat)
-	var bar := _bar(row, Vector2(96, 12))
+	if compact:
+		var title := _label(row)
+		title.text = stat.capitalize()
+		title.add_theme_font_size_override("font_size", 16)
+	else:
+		_icon(row, stat)
+	var bar := _bar(row, Vector2(40 if compact else 96, 12))
 	var label := _label(row)
-	label.custom_minimum_size.x = 80
+	label.custom_minimum_size.x = 48 if compact else 80
+	if compact:
+		label.add_theme_font_size_override("font_size", 16)
 	return [bar, label]
 
 

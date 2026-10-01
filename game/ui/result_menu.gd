@@ -6,6 +6,7 @@ signal return_requested
 
 const Definitions := preload("res://sim/definitions.gd")
 const SelectionMenu := preload("res://ui/selection_menu.gd")
+const Presentation := preload("res://view/combat_presentation.gd")
 
 const OUTCOME_TEXT := {"victory": "Victory", "defeat": "Defeat", "draw": "Draw", "escaped": "Escaped"}
 const ESCAPE_REASON := "Escaped — you broke pursuit while an opponent remained operational."
@@ -52,7 +53,9 @@ func show_result(sim) -> void:
 		lines.push_front(ESCAPE_REASON)
 	for d in sim.result["defeated"]:
 		var ship: Dictionary = sim.ships[d["ship_id"]]
-		var name := ("Sloop %s" % ("A" if d["ship_id"] == 2 else "B") if sim.ships.has(3) else "Enemy A") if ship["team"] == 1 else "You"
+		var name: String = Presentation.ship_label(sim, d["ship_id"]) if ship["team"] == 1 else "You"
+		if not sim.ships.has(3) and ship["team"] == 1:
+			name = Presentation.marker_badge(sim, d["ship_id"])
 		if d["reason"] == "sunk":
 			lines.append("%s (%s) sunk." % [name, Definitions.VESSELS[ship["vessel_id"]]["display_name"]])
 		else:
@@ -61,7 +64,7 @@ func show_result(sim) -> void:
 	if sim.ships.has(3):
 		for id in [2, 3]:
 			if sim.ships[id]["active"]:
-				lines.append("Sloop %s (Sloop) Active." % ("A" if id == 2 else "B"))
+				lines.append("%s (Sloop) Active." % Presentation.ship_label(sim, id))
 	detail_label.text = "\n".join(lines)
 	visible = true
 	replay_button.grab_focus()

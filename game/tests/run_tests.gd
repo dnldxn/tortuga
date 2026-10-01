@@ -22,6 +22,7 @@ const SUITES: Array[String] = [
 	"res://tests/test_two_opponent_escape.gd",
 	"res://tests/test_settings.gd",
 	"res://tests/test_settings_ui.gd",
+	"res://tests/test_presentation.gd",
 ]
 
 const ISOLATION_MESSAGE := "Settings tests require isolated user data. Run: bash game/tests/run_settings_checks.sh"
@@ -29,6 +30,7 @@ const ISOLATION_MESSAGE := "Settings tests require isolated user data. Run: bash
 var checks := 0
 var failures := 0
 var _started := false
+var _cleanup_frames := 10
 
 
 ## True only when user:// lives under a nonempty absolute $TORTUGA_TEST_ROOT, so tests can never
@@ -51,6 +53,9 @@ func _initialize() -> void:
 ## scenes added by suites receive _ready. They still run synchronously within that frame.
 func _process(_delta: float) -> bool:
 	if _started:
+		_cleanup_frames -= 1
+		if _cleanup_frames == 0:
+			quit(1 if failures > 0 else 0)
 		return false
 	_started = true
 	for path in SUITES:
@@ -58,7 +63,7 @@ func _process(_delta: float) -> bool:
 	if "--self-test-failure" in OS.get_cmdline_user_args():
 		check(false, "deliberate self-test failure (--self-test-failure)")
 	print("Tests: %d checks, %d failures" % [checks, failures])
-	quit(1 if failures > 0 else 0)
+	# Let stopped WAV playbacks drain before the headless audio server shuts down.
 	return false
 
 

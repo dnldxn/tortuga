@@ -4,6 +4,7 @@ extends RefCounted
 
 const Definitions := preload("res://sim/definitions.gd")
 const ShipView := preload("res://view/ship_3d_view.gd")
+const Presentation := preload("res://view/combat_presentation.gd")
 
 var main
 var view
@@ -67,10 +68,10 @@ func _test_models(t) -> void:
 
 func _test_camera_config(t) -> void:
 	var cam: Camera2D = view.camera
-	t.check([cam.limit_left, cam.limit_top, cam.limit_right, cam.limit_bottom] == [0, 0, 6000, 4200],
-		"camera limits 0/0/6000/4200")
+	t.check([cam.limit_left, cam.limit_top, cam.limit_right, cam.limit_bottom] == [-240, -240, 6240, 4440],
+		"camera limits include 240 world-unit decoration")
 	t.check(cam.zoom == Vector2.ONE, "camera zoom 1")
-	t.check(cam.position_smoothing_enabled and cam.position_smoothing_speed == 5.0, "camera smoothing speed 5")
+	t.check(not cam.position_smoothing_enabled, "camera uses only exponential manual smoothing")
 	t.check(cam.ignore_rotation, "camera ignores rotation")
 	t.check(not (cam.get_parent() is CanvasLayer) and main.hud.get_parent() is CanvasLayer, "UI on CanvasLayer, camera in world")
 
@@ -135,7 +136,7 @@ func _test_vessel(t, vessel_id: String) -> void:
 	node.advance_motion(0.5)
 	t.check(node.motion_pivot.rotation != before_motion and absf(node.motion_pivot.rotation.x) < deg_to_rad(1.0),
 		"%s: speed drives sub-degree rocking" % vessel_id)
-	t.check(view.camera.position == main.sim.ships[1]["position"], "%s: camera targets player" % vessel_id)
+	t.check(view.camera.position.distance_to(main.sim.ships[1]["position"]) <= 160.0, "%s: camera bias bounded from player" % vessel_id)
 
 
 func _test_restart_snaps_camera(t) -> void:
@@ -143,8 +144,8 @@ func _test_restart_snaps_camera(t) -> void:
 		main.advance_tick()
 	main.restart_practice()
 	var spawn: Vector2 = Definitions.PRESETS["practice"]["player_position"]
-	t.check(view.camera.position == spawn, "restart: camera target at spawn")
-	t.check(view.camera.get_screen_center_position().distance_to(spawn) < 1.0, "restart: smoothing reset to spawn")
+	t.check(view.camera.position.distance_to(spawn) <= 160.0, "restart: camera bias bounded at spawn")
+	t.check(view.camera.get_screen_center_position().distance_to(view.camera.position) < 1.0, "restart: smoothing snapped to fresh center")
 	t.check(_player_node().position == spawn, "restart: player ship node at spawn")
 
 
@@ -204,8 +205,8 @@ func _test_target_marker(t) -> void:
 	t.check(off["offscreen"] and off["position"].x <= 1280 and off["position"].x > 640,
 		"distant target marker clamps to right edge toward target")
 	var on: Dictionary = view.target_marker(center, target, screen)
-	t.check(not on["offscreen"] and on["position"].distance_to(Vector2(1140, 360)) < 1.0,
-		"near target marker lies at projected screen position")
+	t.check(on["offscreen"] == not Presentation.gameplay_rect(screen.size).has_point(view.get_canvas_transform() * target),
+		"marker uses active canvas transform")
 	main.sim.ships[2]["position"] = center + Vector2(-1200, -900)
 	var upper_left: Dictionary = view.target_marker(center, main.sim.ships[2]["position"], screen)
 	t.check(upper_left["offscreen"] and upper_left["position"].x < 640 and upper_left["position"].y < 360,
@@ -228,7 +229,7 @@ func _test_two_enemy_framing(t) -> void:
 	var sim = main.sim
 	view.sync(sim)
 	t.check(view._ships.has(2) and view._ships.has(3), "view has distinct nodes for both sloops")
-	t.check(view._desired_camera_center(sim) == Vector2(2900, 2100), "camera centers on player and both active enemies")
+	t.check(view._desired_camera_center(sim).distance_to(sim.ships[1]["position"]) <= 160.0, "camera center bias limited to 160")
 	var screen := Rect2(Vector2.ZERO, Vector2(1280, 720))
 	var center: Vector2 = sim.ships[1]["position"]
 	sim.ships[2]["position"] = center + Vector2(2500, 0)
@@ -236,7 +237,7 @@ func _test_two_enemy_framing(t) -> void:
 	var markers: Dictionary = view.enemy_markers(sim, center, screen)
 	t.check(markers.has(2) and markers.has(3), "both offscreen enemies have markers")
 	if markers.has(2) and markers.has(3):
-		var safe := screen.grow(-24)
+		var safe := Presentation.gameplay_rect(screen.size)
 		t.check(markers[2].distance_to(markers[3]) >= 24.0 and markers[2] == markers[2].clamp(safe.position, safe.end)
 			and markers[3] == markers[3].clamp(safe.position, safe.end), "colliding markers separate 24 px and stay visible")
 		for positions in [[center + Vector2(2500, 0), center + Vector2(2600, 32)],
@@ -250,17 +251,17 @@ func _test_two_enemy_framing(t) -> void:
 			markers = view.enemy_markers(sim, center, screen)
 			var a: Rect2 = view.marker_label_rect(sim, 2, markers[2], center, screen)
 			var b: Rect2 = view.marker_label_rect(sim, 3, markers[3], center, screen)
-			t.check(not a.intersects(b) and screen.encloses(a) and screen.encloses(b)
+			t.check(not a.intersects(b) and safe.encloses(a) and safe.encloses(b)
 				and markers[2].distance_to(markers[3]) >= 24.0,
 				"crowded %s edge keeps both measured labels visible and separated" % positions[0])
 	sim.ships[2]["active"] = false
 	view.sync(sim)
 	t.check(not view.enemy_markers(sim, center, screen).has(2)
 		and view.enemy_markers(sim, center, screen).has(3), "defeated enemy no longer has edge marker")
-	t.check(view._ships[2].ship_viewport.render_target_update_mode == SubViewport.UPDATE_DISABLED,
-		"defeated enemy stops rendering its 3D viewport")
-	t.check(view._desired_camera_center(sim) == (center + sim.ships[3]["position"]) / 2.0,
-		"camera reframes on remaining opponent")
+	t.check(view._ships[2].visible and view._ships[2].modulate.a < 1.0,
+		"defeated enemy remains a subdued silhouette")
+	t.check(view._desired_camera_center(sim).distance_to(center) <= 160.0,
+		"camera follows player when remaining opponent is remote")
 	main.start_encounter("duel_sloop", "sloop")
 	view.sync(main.sim)
 	t.check(not view._ships.has(3) and not view.enemy_markers(main.sim, center, screen).has(3),

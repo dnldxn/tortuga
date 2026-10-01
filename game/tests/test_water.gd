@@ -21,6 +21,13 @@ func run(t) -> bool:
 		"refined Reef Glass shader is bound")
 	t.check(water.material.get_shader_parameter("arena_size") == Definitions.ARENA_SIZE,
 		"water covers the world arena")
+	var expanded := Rect2(Vector2(-240, -240), Definitions.ARENA_SIZE + Vector2(480, 480))
+	t.check(water.has_method("draw_bounds"), "water exposes geometry bounds for draw coverage")
+	if water.has_method("draw_bounds"):
+		var water_draw: Rect2 = water.draw_bounds()
+		t.check(water_draw == expanded and water_draw.has_point(Vector2(-239, -239))
+			and water_draw.has_point(Definitions.ARENA_SIZE + Vector2(239, 239)),
+			"water geometry fills camera-visible expanded bounds at opposite corners")
 	main.advance_tick()
 	t.near(water.animation_time, 0.0, 1e-9, "selection water stays still")
 	main.start_practice("sloop")

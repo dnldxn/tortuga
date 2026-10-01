@@ -48,6 +48,27 @@ var _sail_base_scales: Array[Vector3] = []
 var _sail_base_positions: Array[Vector3] = []
 var _sail_top_local_y: Array[float] = []
 var _sail_material := StandardMaterial3D.new()
+var condition_overlay: ConditionOverlay
+
+
+class ConditionOverlay extends Node2D:
+	var radius := 22.0
+	var hull_fraction := 1.0
+	var sail_fraction := 1.0
+	var reefed := false
+
+	func _draw() -> void:
+		if hull_fraction < .5:
+			draw_polyline(PackedVector2Array([Vector2(-radius * .7, -3), Vector2(-5, 3), Vector2(3, -2)]), Color.BLACK, 2.5)
+			draw_polyline(PackedVector2Array([Vector2(3, -2), Vector2(radius * .6, 6)]), Color.WHITE, 2.5)
+			if hull_fraction < .25:
+				draw_polyline(PackedVector2Array([Vector2(-radius * .3, 8), Vector2(4, -8), Vector2(radius * .7, 1)]), Color.BLACK, 3)
+		if sail_fraction < .5:
+			draw_polyline(PackedVector2Array([Vector2(-9, -radius), Vector2(-3, -radius * .55), Vector2(2, -radius), Vector2(8, -radius * .6)]), Color.BLACK, 3)
+			if sail_fraction < .25:
+				draw_line(Vector2(-radius * .5, -radius * .7), Vector2(radius * .5, -radius * .7), Color.BLACK, 5)
+		elif reefed:
+			draw_line(Vector2(-7, -radius * .45), Vector2(7, -radius * .45), Color.WHITE, 2)
 
 
 func setup(id: String, radius: float) -> void:
@@ -58,6 +79,10 @@ func setup(id: String, radius: float) -> void:
 	_build_viewport()
 	_build_model()
 	_build_display(radius)
+	condition_overlay = ConditionOverlay.new()
+	condition_overlay.name = "ConditionOverlay"
+	condition_overlay.radius = radius
+	add_child(condition_overlay)
 	_apply_sail_condition(1.0)
 
 
@@ -171,6 +196,11 @@ func set_ship_state(heading: float, wind_heading: float, normalized_speed: float
 				_sail_base_scales[index].y - sail_scale.y)
 	display_sprite.modulate = Color.WHITE.lerp(HULL_DAMAGED, 1.0 - clampf(hull_fraction, 0.0, 1.0))
 	_apply_sail_condition(sail_fraction)
+	condition_overlay.rotation = heading
+	condition_overlay.hull_fraction = hull_fraction
+	condition_overlay.sail_fraction = sail_fraction
+	condition_overlay.reefed = is_reefed
+	condition_overlay.queue_redraw()
 
 
 func set_ship_active(active: bool) -> void:

@@ -18,6 +18,8 @@ const ResultMenu := preload("res://ui/result_menu.gd")
 const Hud := preload("res://ui/hud.gd")
 const Settings := preload("res://settings.gd")
 const SettingsMenu := preload("res://ui/settings_menu.gd")
+const Presentation := preload("res://view/combat_presentation.gd")
+const CombatAudio := preload("res://audio/combat_audio.gd")
 
 const DT := 1.0 / 60.0
 const PRESET := "practice"
@@ -36,6 +38,7 @@ var hud: Control
 var pause_menu: Control
 var result_menu: Control
 var settings_menu: Control
+var combat_audio: Node
 
 var _held := {}  # turn actions freshly pressed while sailing and not yet released
 var _toggle_queued := false  # parity of non-echo toggle presses since the last tick
@@ -47,6 +50,9 @@ func _ready() -> void:
 	Bindings.install_defaults()
 	settings.load_settings()
 	settings.apply_values(settings.values)
+	combat_audio = CombatAudio.new()
+	combat_audio.name = "CombatAudio"
+	add_child(combat_audio)
 	var theme := _make_theme()
 	hud = Hud.new()
 	pause_menu = PauseMenu.new()
@@ -98,13 +104,15 @@ func advance_tick() -> void:
 			if id != NavalSimulation.PLAYER_ID:
 				commands[id] = ai_commands[id]
 	sim.step(DT, commands)
-	if not sim.result.is_empty():
-		_enter_mode("result")
+	var presentation_events: Array = Presentation.normalize_events(sim.events)
+	combat_audio.consume(presentation_events)
 	arena_view.advance_effects()
 	hud.advance_effects()
-	arena_view.consume_events(sim.events)
-	hud.consume_events(sim.events)
+	arena_view.consume_events(presentation_events)
+	hud.consume_events(presentation_events)
 	hud.refresh(sim)
+	if not sim.result.is_empty():
+		_enter_mode("result")
 
 
 ## A duel is any non-practice encounter (practice has no AI opponent that acts).
@@ -126,6 +134,7 @@ func start_encounter(preset_id: String, vessel_id: String) -> void:
 	hud.reset_effects()
 	arena_view.reset_effects()
 	_enter_mode("sailing")
+	combat_audio.start_encounter()
 	practice_started.emit()
 
 
@@ -135,6 +144,7 @@ func restart_practice() -> void:
 
 
 func return_to_selection() -> void:
+	combat_audio.clear()
 	sim = NavalSimulation.new()
 	ai = AIController.new()
 	hud.reset_effects()
@@ -144,9 +154,11 @@ func return_to_selection() -> void:
 
 func set_paused(value: bool) -> void:
 	if value and mode == "sailing":
+		combat_audio.set_paused(true)
 		_enter_mode("paused")
 	elif not value and mode == "paused":
 		_enter_mode("sailing")
+		combat_audio.set_paused(false)
 
 
 ## Overlays the settings menu on the selection or pause menu. No reset, no resume.
@@ -218,6 +230,8 @@ func _notification(what: int) -> void:
 
 func _enter_mode(new_mode: String) -> void:
 	mode = new_mode
+	if mode == "result":
+		combat_audio.clear()
 	_clear_input()
 	selection.visible = mode == "selection"
 	hud.visible = mode != "selection"

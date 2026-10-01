@@ -4,6 +4,7 @@ extends Node2D
 
 const Definitions := preload("res://sim/definitions.gd")
 const WATER_SHADER := preload("res://view/reef_glass.gdshader")
+const Presentation := preload("res://view/combat_presentation.gd")
 
 var animation_time := 0.0
 var drift := Vector2.ZERO
@@ -44,5 +45,10 @@ func _sync_animation() -> void:
 	water_material.set_shader_parameter("surface_drift", drift)
 
 
+func draw_bounds() -> Rect2:
+	return Rect2(Vector2.ONE * -Presentation.CAMERA_MARGIN,
+		Definitions.ARENA_SIZE + Vector2.ONE * Presentation.CAMERA_MARGIN * 2.0)
+
+
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Definitions.ARENA_SIZE), Color.WHITE)
+	draw_rect(draw_bounds(), Color.WHITE)
