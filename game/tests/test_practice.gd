@@ -169,7 +169,7 @@ func _test_target_defeat_keeps_practice(t) -> void:
 	sim.step(DT, {1: {"turn": 1.0}})
 	t.check(sim.ships[1]["heading"] > heading, "player still controllable after target defeat")
 	sim.ships[1]["heading"] = 0.0
-	for i in 300:  # sail due east straight through the wreck's circle
+	for i in 400:  # sail due east straight through the wreck's circle
 		sim.step(DT, {})
 	var p: Vector2 = sim.ships[1]["position"]
 	t.check(p.x > 3000.0 + 50.0 and absf(p.y - 2100.0) < 1.0, "player sails through the inactive target (at %s)" % p)

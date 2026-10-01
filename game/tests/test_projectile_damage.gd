@@ -95,7 +95,7 @@ func _test_nearest_contact_and_ties(t) -> void:
 		_shot(sim, 9, "round", Vector2(1000, 1000), Vector2.RIGHT)
 		sim._apply_damage(sim._advance_projectiles(DT * 20.0, [2, 5]))  # 200-unit segment reaches both
 		t.check(sim.ships[2]["hull"] == 152.0 and sim.ships[5]["hull"] == 240.0, "nearest contact wins regardless of insertion (reverse=%s)" % reverse)
-		var tie = _sim_with([_ship(4, 1, "sloop", Vector2(1030, 1000)), _ship(3, 1, "sloop", Vector2(1030, 1000))], reverse)
+		var tie = _sim_with([_ship(4, 1, "sloop", Vector2(1025, 1000)), _ship(3, 1, "sloop", Vector2(1025, 1000))], reverse)
 		_shot(tie, 9, "round", Vector2(1000, 1000), Vector2.RIGHT)
 		tie._advance_projectiles(DT, [3, 4])
 		t.check(_of_type(tie, "hit").size() == 1 and _of_type(tie, "hit")[0]["victim_id"] == 3, "coincident colliders tie to lower ID (reverse=%s)" % reverse)
@@ -112,7 +112,7 @@ func _test_range_endpoint(t) -> void:
 
 
 func _test_travel(t) -> void:
-	for c in [["round", 900.0, 100], ["chain", 600.0, 80], ["grape", 300.0, 45]]:
+	for c in [["round", 900.0, 125], ["chain", 600.0, 100], ["grape", 300.0, 56]]:
 		var sim = _sim_with([_ship(1, 0, "sloop", Vector2(2500, 2100))])
 		sim.ships[1]["weapons"]["port"] = {"ammo": c[0], "loads": [1.0, 0.0, 0.0, 0.0]}
 		sim.step(DT, {1: {"fire_port": true}})
@@ -138,6 +138,8 @@ func _test_owner_clearance(t) -> void:
 	sim.step(DT, {})
 	t.check(not sim.projectiles[0]["owner_cleared"], "shot still inside owner circle")
 	sim.step(DT, {})
+	t.check(not sim.projectiles[0]["owner_cleared"], "shot still inside owner circle (tick 3)")
+	sim.step(DT, {})
 	t.check(sim.projectiles[0]["owner_cleared"], "shot cleared once endpoint leaves owner circle")
 	t.check(sim.ships[1]["hull"] == 100.0, "owner never hit while leaving")
 	var gone = _sim_with([_ship(1, 0, "sloop", Vector2(2500, 2100)), _ship(2, 1, "brig", Vector2(4000, 2100))])
@@ -153,7 +155,7 @@ func _test_muzzle_and_owner_hits(t) -> void:
 	sim._apply_damage(sim._advance_projectiles(DT, [1, 2]))
 	t.check(sim.ships[1]["hull"] == 100.0 and sim.ships[2]["hull"] == 92.0, "muzzle exception skips owner only; overlapping ally hit")
 	var own = _sim_with([_ship(1, 0, "sloop", Vector2(1000, 1000))])
-	_shot(own, 1, "round", Vector2(1000, 970), Vector2.DOWN, true)
+	_shot(own, 1, "round", Vector2(1000, 975), Vector2.DOWN, true)
 	own._apply_damage(own._advance_projectiles(DT, [1]))
 	t.check(own.ships[1]["hull"] == 92.0, "cleared shot can hit its owner")
 
@@ -196,7 +198,7 @@ func _test_fixed_direction_and_miss(t) -> void:
 	var dir: Vector2 = sim.projectiles[0]["direction"]
 	t.check(_of_type(sim, "shot")[0]["direction"] == dir, "shot event carries projectile direction")
 	var fixed := true
-	for i in 120:
+	for i in 150:
 		sim.step(DT, {1: {"turn": 1.0}, 2: {"turn": -0.3}})
 		if not sim.projectiles.is_empty():
 			fixed = fixed and sim.projectiles[0]["direction"] == dir
@@ -301,7 +303,7 @@ func _test_damage_effects(t) -> void:
 	# Chain brings sails 56 -> 50 (half): next tick speed uses .3+.7*.5 = .65.
 	var sim = _hit_brig("chain", [160.0, 56.0, 90.0])
 	sim.step(DT, {})
-	t.near(sim.ships[2]["speed"], 130.5 * 0.8 * 0.65, 1e-4, "half sails after chain: .65 speed scale")
+	t.near(sim.ships[2]["speed"], 104.4 * 0.8 * 0.65, 1e-4, "half sails after chain: .65 speed scale")
 	# Grape brings crew 50 -> 45 (half): this tick reloads at pre-damage crew, next at .625.
 	var brig := _ship(2, 1, "brig", Vector2(3000, 2100))
 	brig["crew"] = 50.0

@@ -19,21 +19,21 @@ const VESSELS := {
 	"sloop": {
 		"display_name": "Sloop",
 		"description": "Fastest, tightest turns, light protection",
-		"full_speed": 162.0, "turn_rate": 1.2,
+		"full_speed": 129.6, "turn_rate": 1.2,
 		"hull": 100.0, "sails": 70.0, "crew": 60.0,
 		"guns_per_side": 4, "base_reload": 7.0, "radius": 22.0,
 	},
 	"brig": {
 		"display_name": "Brig",
 		"description": "Balanced handling and protection",
-		"full_speed": 130.5, "turn_rate": 0.85,
+		"full_speed": 104.4, "turn_rate": 0.85,
 		"hull": 160.0, "sails": 100.0, "crew": 90.0,
 		"guns_per_side": 6, "base_reload": 8.0, "radius": 28.0,
 	},
 	"frigate": {
 		"display_name": "Frigate",
 		"description": "Slow, wide turns, heavy protection",
-		"full_speed": 99.0, "turn_rate": 0.6,
+		"full_speed": 79.2, "turn_rate": 0.6,
 		"hull": 240.0, "sails": 140.0, "crew": 140.0,
 		"guns_per_side": 8, "base_reload": 9.0, "radius": 34.0,
 	},
@@ -97,9 +97,9 @@ const REEF_TURN_FACTOR := 1.4
 
 ## Each ammo type damages exactly one track. Speed in units/s, range in units.
 const AMMO := {
-	"round": {"display_name": "Round", "range": 900.0, "speed": 540.0, "damage": 8.0, "track": "hull"},
-	"chain": {"display_name": "Chain", "range": 600.0, "speed": 450.0, "damage": 6.0, "track": "sails"},
-	"grape": {"display_name": "Grape", "range": 300.0, "speed": 405.0, "damage": 5.0, "track": "crew"},
+	"round": {"display_name": "Round", "range": 900.0, "speed": 432.0, "damage": 8.0, "track": "hull"},
+	"chain": {"display_name": "Chain", "range": 600.0, "speed": 360.0, "damage": 6.0, "track": "sails"},
+	"grape": {"display_name": "Grape", "range": 300.0, "speed": 324.0, "damage": 5.0, "track": "crew"},
 }
 const AMMO_CYCLE: Array[String] = ["round", "chain", "grape"]
 

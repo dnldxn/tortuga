@@ -65,10 +65,10 @@ func _test_reset(t) -> void:
 
 func _test_sloop_fairness(t) -> void:
 	var vessel: Dictionary = Definitions.VESSELS["sloop"]
-	t.check(vessel["full_speed"] == 162.0 and vessel["turn_rate"] == 1.2
+	t.check(vessel["full_speed"] == 129.6 and vessel["turn_rate"] == 1.2
 		and [vessel["hull"], vessel["sails"], vessel["crew"]] == [100.0, 70.0, 60.0]
 		and [vessel["guns_per_side"], vessel["base_reload"], vessel["radius"]] == [4, 7.0, 22.0],
-		"sloops share existing 162 speed, turns, tracks, guns, reload and radius")
+		"sloops share existing 129.6 speed, turns, tracks, guns, reload and radius")
 	var sim = NavalSimulation.new()
 	sim.reset("two_sloops", "sloop")
 	# Translated, identical orientations and tracks yield identical speed/turn/reload.
@@ -151,7 +151,7 @@ func _test_ally_avoidance(t) -> void:
 	sim.ships[3]["position"] = Vector2(3080, 2100)
 	for id in [2, 3]:
 		sim.ships[id]["heading"] = 0.0
-		sim.ships[id]["speed"] = 162.0 if id == 2 else 0.0
+		sim.ships[id]["speed"] = 129.6 if id == 2 else 0.0
 	var ai = AIController.new()
 	var first: Dictionary = ai.commands_for_tick(sim.ai_observation(), DT)
 	t.check(ai._memory[2].recovering and ai._memory[3].recovering
@@ -163,7 +163,7 @@ func _test_ally_avoidance(t) -> void:
 	inactive.ships[1]["position"] = Vector2(4800, 3500)
 	inactive.ships[2]["position"] = Vector2(3000, 2100)
 	inactive.ships[2]["heading"] = 0.0
-	inactive.ships[2]["speed"] = 162.0
+	inactive.ships[2]["speed"] = 129.6
 	inactive.ships[3]["position"] = Vector2(3080, 2100)
 	inactive.ships[3]["heading"] = 0.0
 	inactive.ships[3]["speed"] = 0.0
