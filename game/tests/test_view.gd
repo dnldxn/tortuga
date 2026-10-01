@@ -3,13 +3,14 @@ extends RefCounted
 ## Headless: proves node/transform state, not what is visually rendered.
 
 const Definitions := preload("res://sim/definitions.gd")
+const ShipView := preload("res://view/ship_3d_view.gd")
 
 var main
 var view
 
 
 func run(t) -> bool:
-	_test_textures(t)
+	_test_models(t)
 	main = load("res://main.tscn").instantiate()
 	t.root.add_child(main)
 	main.set_physics_process(false)
@@ -30,11 +31,11 @@ func run(t) -> bool:
 
 
 func _ship_nodes() -> Array:
-	return view.get_children().filter(func(n): return n is Sprite2D)
+	return view.get_children().filter(func(n): return n.get_meta("ship_3d_view", false))
 
 
-## The view keys sprites by stable ship id; practice also has the target (id 2).
-func _player_node() -> Sprite2D:
+## The view keys 3D adapters by stable ship id; practice also has the target (id 2).
+func _player_node() -> Node2D:
 	return view._ships[main.sim.PLAYER_ID]
 
 
@@ -45,13 +46,23 @@ func _snapshot() -> Dictionary:
 		"selected_vessel_id": sim.selected_vessel_id, "result": sim.result.duplicate(true)}
 
 
-func _test_textures(t) -> void:
-	var widths := {"sloop": 64, "brig": 80, "frigate": 96}
-	for id in widths:
-		var tex = load("res://assets/ships/%s.svg" % id)
-		t.check(tex is Texture2D, "%s.svg loads as Texture2D" % id)
-		t.check(tex is Texture2D and tex.get_width() == widths[id] and tex.get_height() == widths[id] / 2,
-			"%s.svg is %dx%d" % [id, widths[id], widths[id] / 2])
+func _test_models(t) -> void:
+	t.check(ShipView.MODEL_SCENES.size() == Definitions.VESSELS.size()
+		and Definitions.VESSELS.keys().all(func(id): return ShipView.MODEL_SCENES.has(id)),
+		"3D presentation map covers every simulation vessel class")
+	for id in Definitions.VESSELS:
+		var resource = load("res://assets/ships/3d/%s.glb" % id)
+		t.check(resource is PackedScene, "%s.glb loads as PackedScene" % id)
+		if resource is PackedScene:
+			var instance: Node = resource.instantiate()
+			var meshes := _descendants_of_type(instance, "MeshInstance3D")
+			t.check(meshes.size() >= 20, "%s.glb retains detailed 3D geometry" % id)
+			t.check(meshes.size() <= 64, "%s.glb is batched for bounded draw calls" % id)
+			t.check(_descendants_named(instance, "SailPivot_").size() == ShipView.TRIM_FACTORS[id].size(),
+				"%s.glb exposes every animated sail pivot" % id)
+			t.check(not _descendants_named(instance, "SailSurface_").is_empty(),
+				"%s.glb exposes reefable sail cloth" % id)
+			instance.free()
 
 
 func _test_camera_config(t) -> void:
@@ -77,21 +88,53 @@ func _test_vessel(t, vessel_id: String) -> void:
 	var nodes := _ship_nodes()
 	t.check(nodes.size() == active.size() and nodes.size() == 2, "%s: one ship node per active ship (player + target)" % vessel_id)
 	var ship: Dictionary = main.sim.ships[main.sim.PLAYER_ID]
-	var node: Sprite2D = _player_node()
+	var node: Node2D = _player_node()
 	t.check(node.position == ship["position"], "%s: node position matches sim" % vessel_id)
-	t.near(node.rotation, ship["heading"], 1e-5, "%s: rotation equals heading" % vessel_id)
+	t.near(node.rotation, 0.0, 1e-5, "%s: 2D adapter stays fixed while 3D hull turns" % vessel_id)
+	t.near(node.heading_pivot.rotation.y, -node.visual_yaw_for_heading(ship["heading"]), 1e-5,
+		"%s: 3D yaw follows heading through 30-degree projection" % vessel_id)
 	t.check(absf(ship["heading"]) > 0.01, "%s: heading actually changed during test" % vessel_id)
 	var radius: float = Definitions.VESSELS[vessel_id]["radius"]
-	t.near(node.texture.get_width() * node.scale.x, 2.0 * radius, 0.5, "%s: displayed length = diameter" % vessel_id)
-	t.near(node.texture.get_height() * node.scale.y, radius, 0.5, "%s: displayed beam = radius" % vessel_id)
-	var patch: Node2D = node.get_node("Sails").get_child(0)
-	var full := patch.scale
+	t.near(ShipView.DISPLAY_REFERENCE_WIDTH * node.display_sprite.scale.x, 2.0 * radius, 0.5,
+		"%s: rendered model scale follows collision diameter" % vessel_id)
+	t.check(node.model_instance is Node3D and not node.sail_pivots.is_empty() and not node.sail_surfaces.is_empty(),
+		"%s: adapter owns model, rig pivots, and sail surfaces" % vessel_id)
+	var camera_target := Vector3(0.0, ShipView.CAMERA_TARGET_Y[vessel_id], 0.0)
+	var camera_offset: Vector3 = node.model_camera.position - camera_target
+	var camera_angle := rad_to_deg(atan2(camera_offset.y, camera_offset.z))
+	t.near(camera_angle, 30.0, 0.1, "%s: model camera is 30 degrees above horizontal" % vessel_id)
+	var every_heading_fits := true
+	var projected_records := []
+	for cardinal in [0.0, PI / 2.0, PI, -PI / 2.0]:
+		for wind_offset in [0.0, PI / 2.0, -PI / 2.0]:
+			node.set_ship_state(cardinal, cardinal + wind_offset, 0.0, false, 1.0, 1.0)
+			var projected := _projected_model_bounds(node)
+			projected_records.append(projected)
+			every_heading_fits = (every_heading_fits and projected.position.x >= -1.0
+				and projected.position.y >= -1.0 and projected.end.x <= ShipView.VIEWPORT_SIZE.x + 1.0
+				and projected.end.y <= ShipView.VIEWPORT_SIZE.y + 1.0)
+	t.check(every_heading_fits, "%s: complete wind-trimmed rig stays in frame through cardinal turns %s"
+		% [vessel_id, projected_records])
+	view.sync(main.sim)
+	var previous_trim: float = node.sail_pivots[0].rotation.y
+	main.sim.wind_heading += PI / 2.0
+	view.sync(main.sim)
+	t.check(not is_equal_approx(node.sail_pivots[0].rotation.y, previous_trim)
+		and not is_zero_approx(node.sail_trim), "%s: sail rig rotates when wind direction changes" % vessel_id)
+	var full: Vector3 = node.sail_surfaces[0].scale
+	var full_top: float = node.sail_surfaces[0].position.y + node._sail_top_local_y[0] * full.y
 	main._input(_key(KEY_W, true))
 	main._input(_key(KEY_W, false))
 	main.advance_tick()
 	view.sync(main.sim)
-	t.check(main.sim.ships[1]["reefed"] and patch.scale.x < full.x and patch.scale.y < full.y,
-		"%s: reefed sail patch smaller than full" % vessel_id)
+	t.check(main.sim.ships[1]["reefed"] and node.sail_surfaces[0].scale.x < full.x
+		and node.sail_surfaces[0].scale.y < full.y, "%s: reefing shrinks the 3D sail cloth" % vessel_id)
+	var reefed_top: float = node.sail_surfaces[0].position.y + node._sail_top_local_y[0] * node.sail_surfaces[0].scale.y
+	t.near(reefed_top, full_top, 1e-5, "%s: reefed cloth stays attached at its upper spar" % vessel_id)
+	var before_motion: Vector3 = node.motion_pivot.rotation
+	node.advance_motion(0.5)
+	t.check(node.motion_pivot.rotation != before_motion and absf(node.motion_pivot.rotation.x) < deg_to_rad(1.0),
+		"%s: speed drives sub-degree rocking" % vessel_id)
 	t.check(view.camera.position == main.sim.ships[1]["position"], "%s: camera targets player" % vessel_id)
 
 
@@ -174,10 +217,10 @@ func _test_condition_visuals(t) -> void:
 	main.sim.ships[2]["hull"] = 80.0
 	main.sim.ships[2]["sails"] = 25.0
 	view.sync(main.sim)
-	var target: Sprite2D = view._ships[2]
-	t.check(target.modulate != Color.WHITE, "damaged hull changes sprite appearance")
-	t.check(target.get_node("Sails").get_child(0).color != Color(0.96, 0.93, 0.84, 0.95),
-		"damaged sails change canvas appearance")
+	var target: Node2D = view._ships[2]
+	t.check(target.display_sprite.modulate != Color.WHITE, "damaged hull changes rendered model appearance")
+	t.check(target._sail_material.albedo_color != ShipView.SAIL_FULL,
+		"damaged sails change 3D sail material")
 
 
 func _test_two_enemy_framing(t) -> void:
@@ -214,6 +257,8 @@ func _test_two_enemy_framing(t) -> void:
 	view.sync(sim)
 	t.check(not view.enemy_markers(sim, center, screen).has(2)
 		and view.enemy_markers(sim, center, screen).has(3), "defeated enemy no longer has edge marker")
+	t.check(view._ships[2].ship_viewport.render_target_update_mode == SubViewport.UPDATE_DISABLED,
+		"defeated enemy stops rendering its 3D viewport")
 	t.check(view._desired_camera_center(sim) == (center + sim.ships[3]["position"]) / 2.0,
 		"camera reframes on remaining opponent")
 	main.start_encounter("duel_sloop", "sloop")
@@ -227,6 +272,39 @@ func _count(node: Node) -> int:
 	for child in node.get_children():
 		n += _count(child)
 	return n
+
+
+func _descendants_of_type(node: Node, type_name: String) -> Array:
+	var found := []
+	if node.is_class(type_name):
+		found.append(node)
+	for child in node.get_children():
+		found.append_array(_descendants_of_type(child, type_name))
+	return found
+
+
+func _descendants_named(node: Node, prefix: String) -> Array:
+	var found := []
+	if node.name.begins_with(prefix):
+		found.append(node)
+	for child in node.get_children():
+		found.append_array(_descendants_named(child, prefix))
+	return found
+
+
+func _projected_model_bounds(ship_view: Node2D) -> Rect2:
+	var low := Vector2(INF, INF)
+	var high := Vector2(-INF, -INF)
+	for mesh_node in _descendants_of_type(ship_view.model_instance, "MeshInstance3D"):
+		var mesh_resource: Mesh = mesh_node.mesh
+		for surface in mesh_resource.get_surface_count():
+			var arrays: Array = mesh_resource.surface_get_arrays(surface)
+			var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			for point in vertices:
+				var projected: Vector2 = ship_view.model_camera.unproject_position(mesh_node.to_global(point))
+				low = low.min(projected)
+				high = high.max(projected)
+	return Rect2(low, high - low)
 
 
 func _key(keycode: Key, pressed: bool) -> InputEventKey:

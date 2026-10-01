@@ -5,15 +5,7 @@ extends Node2D
 
 const Definitions := preload("res://sim/definitions.gd")
 const ReefGlass := preload("res://view/reef_glass.gd")
-
-const TEXTURES := {
-	"sloop": preload("res://assets/ships/sloop.svg"),
-	"brig": preload("res://assets/ships/brig.svg"),
-	"frigate": preload("res://assets/ships/frigate.svg"),
-}
-## Mast x positions in sprite-canvas pixels, relative to the sprite centre.
-const MASTS := {"sloop": [2.0], "brig": [-10.0, 12.0], "frigate": [-20.0, 2.0, 22.0]}
-const REEFED_SAIL_SCALE := Vector2(0.6, 0.5)
+const ShipView := preload("res://view/ship_3d_view.gd")
 
 const SHALLOWS := Color(0.36, 0.72, 0.72, 0.25)
 const HATCH := Color(0.9, 0.95, 0.85, 0.45)
@@ -33,7 +25,7 @@ const MARKER_INSET := 24.0
 
 var main: Node
 var camera := Camera2D.new()
-var _ships := {}  # ship id -> Sprite2D
+var _ships := {}  # ship id -> Ship3DView
 var _cues := []  # deep-copied events with ticks; never aliases sim.events
 var marker_layer: CanvasLayer
 var marker_canvas: Control
@@ -100,6 +92,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	sync(main.sim)
+	for ship_view in _ships.values():
+		if ship_view.visible and main.mode == "sailing":
+			ship_view.advance_motion(delta)
 	_fit_camera(delta)
 	marker_canvas.queue_redraw()
 
@@ -157,16 +152,15 @@ func sync(sim) -> void:
 		var ship: Dictionary = sim.ships[id]
 		if not _ships.has(id):
 			_ships[id] = _make_ship(ship["vessel_id"])
+			_ships[id].motion_phase = float(id) * 1.9
 			add_child(_ships[id])
-		var node: Sprite2D = _ships[id]
-		node.visible = ship["active"]
+		var node: Node2D = _ships[id]
+		node.set_ship_active(ship["active"])
 		node.position = ship["position"]
-		node.rotation = ship["heading"]
 		var condition: Dictionary = Definitions.VESSELS[ship["vessel_id"]]
-		node.modulate = Color.WHITE.lerp(Color(0.65, 0.5, 0.44), 1.0 - ship["hull"] / condition["hull"])
-		for patch in node.get_node("Sails").get_children():
-			patch.scale = REEFED_SAIL_SCALE if ship["reefed"] else Vector2.ONE
-			patch.color = Color(0.96, 0.93, 0.84, 0.95).lerp(Color(0.48, 0.42, 0.36), 1.0 - ship["sails"] / condition["sails"])
+		node.set_ship_state(ship["heading"], sim.wind_heading,
+			ship["speed"] / condition["full_speed"], ship["reefed"],
+			ship["hull"] / condition["hull"], ship["sails"] / condition["sails"])
 	if sim.ships.has(sim.PLAYER_ID):
 		# Raw follow target; _fit_camera refines zoom/center each process frame.
 		camera.position = _desired_camera_center(sim)
@@ -187,26 +181,10 @@ func _on_practice_started() -> void:
 	_fit_camera(0.0)
 
 
-func _make_ship(vessel_id: String) -> Sprite2D:
-	var texture: Texture2D = TEXTURES[vessel_id]
-	var sprite := Sprite2D.new()
-	sprite.texture = texture
-	sprite.set_meta("vessel_id", vessel_id)
-	# Displayed length = collision diameter; sails live in canvas pixels under this scale.
-	sprite.scale = Vector2.ONE * (2.0 * Definitions.VESSELS[vessel_id]["radius"] / texture.get_width())
-	var sails := Node2D.new()
-	sails.name = "Sails"
-	sprite.add_child(sails)
-	var half := texture.get_height() * 0.55
-	for x in MASTS[vessel_id]:
-		var patch := Polygon2D.new()
-		patch.position = Vector2(x, 0)
-		patch.color = Color(0.96, 0.93, 0.84, 0.95)
-		# A yard-and-canvas patch across the beam, bellied toward the bow.
-		patch.polygon = PackedVector2Array([Vector2(-2, -half), Vector2(3, -half * 0.8),
-			Vector2(6, 0), Vector2(3, half * 0.8), Vector2(-2, half)])
-		sails.add_child(patch)
-	return sprite
+func _make_ship(vessel_id: String) -> Node2D:
+	var ship_view := ShipView.new()
+	ship_view.setup(vessel_id, Definitions.VESSELS[vessel_id]["radius"])
+	return ship_view
 
 
 func _draw() -> void:

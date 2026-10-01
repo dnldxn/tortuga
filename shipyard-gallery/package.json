@@ -1,0 +1,12 @@
+{
+  "name": "tortuga-shipwrights-table",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "export:game": "node scripts/export-game-models.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  }
+}
