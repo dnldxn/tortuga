@@ -23,6 +23,7 @@ func run(t) -> bool:
 	_test_wind_arrow(t)
 	_test_cue_lifecycle(t)
 	_test_target_marker(t)
+	_test_two_enemy_framing(t)
 	_test_condition_visuals(t)
 	main.free()
 	return true
@@ -177,6 +178,48 @@ func _test_condition_visuals(t) -> void:
 	t.check(target.modulate != Color.WHITE, "damaged hull changes sprite appearance")
 	t.check(target.get_node("Sails").get_child(0).color != Color(0.96, 0.93, 0.84, 0.95),
 		"damaged sails change canvas appearance")
+
+
+func _test_two_enemy_framing(t) -> void:
+	main.start_encounter("two_sloops", "sloop")
+	var sim = main.sim
+	view.sync(sim)
+	t.check(view._ships.has(2) and view._ships.has(3), "view has distinct nodes for both sloops")
+	t.check(view._desired_camera_center(sim) == Vector2(2900, 2100), "camera centers on player and both active enemies")
+	var screen := Rect2(Vector2.ZERO, Vector2(1280, 720))
+	var center: Vector2 = sim.ships[1]["position"]
+	sim.ships[2]["position"] = center + Vector2(2500, 0)
+	sim.ships[3]["position"] = center + Vector2(2600, 0)
+	var markers: Dictionary = view.enemy_markers(sim, center, screen)
+	t.check(markers.has(2) and markers.has(3), "both offscreen enemies have markers")
+	if markers.has(2) and markers.has(3):
+		var safe := screen.grow(-24)
+		t.check(markers[2].distance_to(markers[3]) >= 24.0 and markers[2] == markers[2].clamp(safe.position, safe.end)
+			and markers[3] == markers[3].clamp(safe.position, safe.end), "colliding markers separate 24 px and stay visible")
+		for positions in [[center + Vector2(2500, 0), center + Vector2(2600, 32)],
+			[center + Vector2(-2500, 0), center + Vector2(-2600, 32)],
+			[center + Vector2(0, -2500), center + Vector2(32, -2600)],
+			[center + Vector2(0, 2500), center + Vector2(32, 2600)],
+			[center + Vector2(2500, -2500), center + Vector2(2600, -2600)],
+			[center + Vector2(-2500, 2500), center + Vector2(-2600, 2600)]]:
+			sim.ships[2]["position"] = positions[0]
+			sim.ships[3]["position"] = positions[1]
+			markers = view.enemy_markers(sim, center, screen)
+			var a: Rect2 = view.marker_label_rect(sim, 2, markers[2], center, screen)
+			var b: Rect2 = view.marker_label_rect(sim, 3, markers[3], center, screen)
+			t.check(not a.intersects(b) and screen.encloses(a) and screen.encloses(b)
+				and markers[2].distance_to(markers[3]) >= 24.0,
+				"crowded %s edge keeps both measured labels visible and separated" % positions[0])
+	sim.ships[2]["active"] = false
+	view.sync(sim)
+	t.check(not view.enemy_markers(sim, center, screen).has(2)
+		and view.enemy_markers(sim, center, screen).has(3), "defeated enemy no longer has edge marker")
+	t.check(view._desired_camera_center(sim) == (center + sim.ships[3]["position"]) / 2.0,
+		"camera reframes on remaining opponent")
+	main.start_encounter("duel_sloop", "sloop")
+	view.sync(main.sim)
+	t.check(not view._ships.has(3) and not view.enemy_markers(main.sim, center, screen).has(3),
+		"switch to duel removes second sprite and marker")
 
 
 func _count(node: Node) -> int:

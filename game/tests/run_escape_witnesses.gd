@@ -1,7 +1,7 @@
 extends SceneTree
 ## Test-only escape witness runner (plan 04). Replays stored player command traces
 ## against the real simulation and real AI from an ordinary reset, and requires every
-## duel preset x vessel case to end in "escaped" with operational survivors.
+## non-practice preset x vessel case to end in "escaped" with operational survivors.
 ## Usage: godot --headless --path game --script res://tests/run_escape_witnesses.gd
 
 const NavalSimulation := preload("res://sim/naval_simulation.gd")
@@ -32,7 +32,7 @@ func _initialize() -> void:
 	quit(1 if failures > 0 else 0)
 
 
-## Every non-practice preset x every vessel (9 now; plan 05's preset extends it to 12).
+## Every non-practice preset x every vessel (12 with the two-sloop encounter).
 func _matrix() -> Array:
 	var keys := []
 	for preset_id in Definitions.PRESETS:
@@ -64,7 +64,7 @@ func _load_cases():
 			ok = false
 			continue
 		var key := "%s/%s" % [c["preset_id"], c["vessel_id"]]
-		ok = _check(key in _matrix(), "case is a duel matrix cell: %s" % key) and ok
+		ok = _check(key in _matrix(), "case is a witness matrix cell: %s" % key) and ok
 		ok = _check(not seen.has(key), "case is unique: %s" % key) and ok
 		seen[key] = true
 		ok = _check(_is_int(c["max_ticks"]) and c["max_ticks"] > 0 and c["max_ticks"] <= MAX_TICKS,
@@ -117,7 +117,7 @@ func _run_case(c: Dictionary, report: bool) -> Dictionary:
 	var next_record := 0
 	var turn := 0.0
 	var armed_tick := -1
-	var recent := []  # per-tick minimum enemy distance, last `required` ticks
+	var recent := []  # per-tick squared minimum enemy distance, last `required` ticks
 	for tick in int(c["max_ticks"]):
 		var command := {"turn": turn}
 		if next_record < records.size() and int(records[next_record]["tick"]) == tick:
@@ -157,16 +157,17 @@ func _finish(key: String, sim, tick: int, armed_tick: int, recent: Array, requir
 		var ship: Dictionary = sim.ships[id]
 		live += 1 if ship["active"] and ship["team"] != player["team"] else 0
 		tracks.append("%d:%s h%.0f s%.0f c%.0f" % [id, ship["vessel_id"], ship["hull"], ship["sails"], ship["crew"]])
-	var interval_min: float = recent.min()
-	var ok := _check(recent.size() == required and interval_min > Definitions.ESCAPE_DISTANCE,
+	var interval_min_squared: float = recent.min()
+	var interval_min := sqrt(interval_min_squared)
+	var ok := _check(recent.size() == required and interval_min_squared > Definitions.ESCAPE_DISTANCE * Definitions.ESCAPE_DISTANCE,
 		"%s: every sample of the final %d-tick interval > %s (min %.1f)" % [key, required, Definitions.ESCAPE_DISTANCE, interval_min])
 	ok = _check(player["hull"] > 0 and player["sails"] > 0 and player["crew"] > 0, "%s: player tracks positive" % key) and ok
 	ok = _check(live >= 1, "%s: at least one enemy operational" % key) and ok
-	if report:
-		print("%s: escaped at tick %d (%.2f s), armed at tick %d, live enemies %d, final-interval min distance %.1f, tracks [%s]" % [
-			key, tick, sim.elapsed, armed_tick, live, interval_min, ", ".join(tracks)])
 	if not ok:
 		return {}
+	if report:
+		print("PASS %s: escaped at tick %d (%.2f s), armed at tick %d, live enemies %d, final-interval min distance %.1f, tracks [%s]" % [
+			key, tick, sim.elapsed, armed_tick, live, interval_min, ", ".join(tracks)])
 	return {"tick": tick, "result": sim.result.duplicate(true), "armed": armed_tick, "min": interval_min,
 		"ships": sim.ships.duplicate(true)}
 
@@ -177,7 +178,7 @@ func _nearest_enemy(sim) -> float:
 	for id in sim.ships:
 		var other: Dictionary = sim.ships[id]
 		if other["active"] and other["team"] != player["team"]:
-			nearest = minf(nearest, player["position"].distance_to(other["position"]))
+			nearest = minf(nearest, player["position"].distance_squared_to(other["position"]))
 	return nearest
 
 

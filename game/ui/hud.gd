@@ -1,5 +1,5 @@
 extends Control
-## Read-only practice HUD: four compact corner panels (own ship, enemy, port and starboard
+## Read-only HUD: four compact corner panels (own ship, enemies, port and starboard
 ## broadsides) so the arena centre stays clear. Help text lives in the pause menu.
 ## Feedback ages in physics ticks.
 
@@ -25,6 +25,11 @@ var target_state_label: Label
 var panels := []  # the four corner PanelContainers
 var ship_stats := {}  # stat -> [ProgressBar, Label]
 var target_stats := {}
+var second_target_block: VBoxContainer
+var second_target_label: Label
+var second_target_state_label: Label
+var second_target_stats := {}
+var defeated_notice: Label
 var side_labels := {}  # side -> header Label
 var gun_bars := {}  # side -> Array[ProgressBar], prebuilt for the largest vessel
 var aim_labels := {}
@@ -61,6 +66,16 @@ func _ready() -> void:
 	var where := _row(target)
 	_icon(where, "distance")
 	target_state_label = _label(where)
+	second_target_block = VBoxContainer.new()
+	second_target_block.add_theme_constant_override("separation", 2)
+	target.add_child(second_target_block)
+	second_target_label = _label(second_target_block)
+	for stat in STATS:
+		second_target_stats[stat] = _stat_row(second_target_block, stat)
+	var second_where := _row(second_target_block)
+	_icon(second_where, "distance")
+	second_target_state_label = _label(second_where)
+	defeated_notice = _label(target)
 	var max_guns := 0
 	for vessel in Definitions.VESSELS.values():
 		max_guns = maxi(max_guns, vessel["guns_per_side"])
@@ -143,13 +158,30 @@ func refresh(sim) -> void:
 	wind_arrow.queue_redraw()
 	var target: Dictionary = sim.ships.get(2, {})
 	panels[1].visible = not target.is_empty()
+	second_target_block.visible = sim.ships.has(3)
+	defeated_notice.visible = false
+	if not second_target_block.visible:
+		second_target_label.text = ""
+		second_target_state_label.text = ""
+		for stat in STATS:
+			second_target_stats[stat][1].text = ""
+		defeated_notice.text = ""
 	if not target.is_empty():
 		var target_vessel: Dictionary = Definitions.VESSELS[target["vessel_id"]]
-		target_label.text = "Enemy A (%s)" % target_vessel["display_name"] if sim.preset_id != "practice" else "TARGET · Brig"
+		target_label.text = "Sloop A" if sim.ships.has(3) else ("Enemy A (%s)" % target_vessel["display_name"] if sim.preset_id != "practice" else "TARGET · Brig")
 		_set_stats(target_stats, target, target_vessel)
 		var distance := roundi(target["position"].distance_to(ship["position"]))
-		var state := "Active" if target["active"] else " · ".join(target["defeat_reasons"]).to_upper()
+		var state := "Active" if target["active"] else ("SUNK" if "sunk" in target["defeat_reasons"] else "DISABLED · " + " · ".join(target["defeat_reasons"]).to_upper())
 		target_state_label.text = "%d · %s" % [distance, state]
+	if second_target_block.visible:
+		var second: Dictionary = sim.ships[3]
+		second_target_label.text = "◆ Sloop B"
+		target_label.text = "▲ Sloop A"
+		_set_stats(second_target_stats, second, Definitions.VESSELS[second["vessel_id"]])
+		var second_state := "Active" if second["active"] else ("SUNK" if "sunk" in second["defeat_reasons"] else "DISABLED · " + " · ".join(second["defeat_reasons"]).to_upper())
+		second_target_state_label.text = "%d · %s" % [roundi(second["position"].distance_to(ship["position"])), second_state]
+		defeated_notice.visible = sim.result.is_empty() and target["active"] != second["active"]
+		defeated_notice.text = "1 of 2 enemies defeated" if defeated_notice.visible else ""
 	for side in Definitions.SIDES:
 		var weapon: Dictionary = ship["weapons"][side]
 		var loads: Array = weapon["loads"]
@@ -163,7 +195,9 @@ func refresh(sim) -> void:
 		side_labels[side].text = "%s · %s · %d/%d ready" % [
 			side.capitalize(), Definitions.AMMO[weapon["ammo"]]["display_name"], ready, loads.size()]
 		var aim: Dictionary = sim.aim_for(sim.PLAYER_ID, side)
-		var aim_text: String = "target %d · assisted" % aim["target_id"] if aim["target_id"] != null else AIM_TEXT[aim["reason"]]
+		var aim_text: String = AIM_TEXT[aim["reason"]]
+		if aim["target_id"] != null:
+			aim_text = "Sloop %s · assisted" % ("A" if aim["target_id"] == 2 else "B") if sim.ships.has(3) else "target %d · assisted" % aim["target_id"]
 		aim_labels[side].text = "Range %d · %s" % [roundi(aim["range"]), aim_text]
 		feedback_labels[side].text = "no loaded guns" if _feedback.has(side) else ""
 		feedback_labels[side].visible = _feedback.has(side)

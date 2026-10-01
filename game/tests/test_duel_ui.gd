@@ -15,6 +15,7 @@ func run(t) -> bool:
 	main.set_physics_process(false)
 	_test_selection_to_duel(t)
 	_test_enemy_hud_block(t)
+	_test_two_sloop_ui(t)
 	_test_result_and_replay(t)
 	_test_input_isolation(t)
 	test_disabled_text(t)
@@ -94,6 +95,66 @@ func _test_enemy_hud_block(t) -> void:
 	hud.refresh(main.sim)
 	t.check("SAILS" in _all_text(hud), "defeat reason replaces Active")
 	main.start_encounter("duel_brig", "sloop")
+
+
+func _test_two_sloop_ui(t) -> void:
+	var sel = main.selection
+	t.check(sel.duel_buttons.has("two_sloops"), "selection offers two-sloop preset")
+	if not sel.duel_buttons.has("two_sloops"):
+		return
+	t.check(sel.duel_buttons["duel_frigate"].focus_neighbor_bottom == sel.duel_buttons["duel_frigate"].get_path_to(sel.duel_buttons["two_sloops"])
+		and sel.duel_buttons["two_sloops"].focus_neighbor_bottom == sel.duel_buttons["two_sloops"].get_path_to(sel.quit_button),
+		"keyboard focus reaches fourth preset then Quit in visual order")
+	sel.duel_buttons["two_sloops"].pressed.emit()
+	sel.vessel_buttons["frigate"].button_pressed = true
+	sel.start_button.pressed.emit()
+	t.check(main.sim.preset_id == "two_sloops" and _ship()["vessel_id"] == "frigate"
+		and main.sim.ships.size() == 3, "fourth preset starts with selected vessel and both opponents")
+	var hud = main.hud
+	hud.refresh(main.sim)
+	var text := _all_text(hud)
+	t.check("Sloop A" in text and "Sloop B" in text, "HUD names both stable sloop identities")
+	for id in [2, 3]:
+		var stats: Dictionary = hud.target_stats if id == 2 else hud.second_target_stats
+		t.check(stats["hull"][1].text == "100/100" and stats["sails"][1].text == "70/70"
+			and stats["crew"][1].text == "60/60", "Sloop %s has all current/max tracks" % ("A" if id == 2 else "B"))
+	main.sim.ships[1]["position"] = Vector2(3000, 2100)
+	main.sim.ships[1]["heading"] = 0.0
+	main.sim.ships[2]["position"] = Vector2(3000, 2400)
+	main.sim.ships[3]["position"] = Vector2(3000, 2600)
+	hud.refresh(main.sim)
+	t.check("Sloop A" in hud.aim_labels["starboard"].text, "assisted broadside identifies Sloop A")
+	main.sim.ships[2]["active"] = false
+	main.sim.ships[2]["defeat_reasons"] = ["sails", "crew"]
+	main.sim.ships[3]["hull"] = 40.0
+	hud.refresh(main.sim)
+	t.check("Sloop B" in hud.aim_labels["starboard"].text, "assisted target updates to surviving Sloop B")
+	t.check("SAILS" in _all_text(hud) and "CREW" in _all_text(hud)
+		and "1 of 2 enemies defeated" in _all_text(hud), "HUD retains both defeat reasons and combat notice")
+	t.check("DISABLED" in hud.target_state_label.text and hud.second_target_stats["hull"][1].text == "40/100",
+		"disabled status and surviving enemy damage stay in separate rows")
+	main.sim.result = {"outcome": "victory", "elapsed": 12.0,
+		"defeated": [{"ship_id": 2, "reason": "disabled", "disabled_by": ["sails", "crew"]},
+			{"ship_id": 3, "reason": "sunk", "disabled_by": []}]}
+	main.result_menu.show_result(main.sim)
+	t.check("Sloop A" in main.result_menu.detail_label.text and "Sloop B" in main.result_menu.detail_label.text
+		and "sails and crew" in main.result_menu.detail_label.text,
+		"result reports both opponents and combined disable reasons")
+	main.sim.result = {"outcome": "defeat", "elapsed": 13.0,
+		"defeated": [{"ship_id": 1, "reason": "sunk", "disabled_by": []},
+			{"ship_id": 2, "reason": "disabled", "disabled_by": ["sails", "crew"]}]}
+	main.result_menu.show_result(main.sim)
+	t.check("Sloop B" in main.result_menu.detail_label.text and "Active" in main.result_menu.detail_label.text,
+		"result still identifies undefeated second opponent")
+	main.result_menu.replay_button.pressed.emit()
+	t.check(main.mode == "sailing" and main.sim.preset_id == "two_sloops" and main.sim.ships.size() == 3
+		and main.sim.result.is_empty() and main.sim.events.is_empty() and main.sim.projectiles.is_empty()
+		and main.sim.elapsed == 0.0 and not main.sim.escape_armed and main.sim.escape_clear_ticks == 0,
+		"one-action replay resets both enemies and escape state")
+	main.start_encounter("duel_sloop", "sloop")
+	hud.refresh(main.sim)
+	t.check(not hud.second_target_block.visible and "Sloop B" not in _all_text(hud)
+		and "1 of 2 enemies defeated" not in _all_text(hud), "duel has no second-enemy residue")
 
 
 ## Result -> Replay gives a genuinely fresh encounter; Return stops stepping.

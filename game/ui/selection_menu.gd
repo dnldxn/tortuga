@@ -1,5 +1,5 @@
 extends Control
-## Mode select (practice / three duels / Quit) -> vessel select (vessels / Start / Back).
+## Mode select (practice / duels / two sloops / Quit) -> vessel select.
 ## start_requested carries the chosen preset id and vessel id.
 
 signal start_requested(preset_id: String, vessel_id: String)
@@ -12,6 +12,7 @@ const MODES := [
 	["duel_sloop", "Sloop duel"],
 	["duel_brig", "Brig duel"],
 	["duel_frigate", "Frigate duel"],
+	["two_sloops", "Two-ship encounter — two sloops"],
 ]
 const GUIDANCE := "Sink the enemy, or exhaust its sails or crew. Turn a broadside toward it to fire."
 
@@ -38,7 +39,8 @@ func _ready() -> void:
 	duel_buttons["duel_sloop"] = _button("Sloop duel")
 	duel_buttons["duel_brig"] = _button("Brig duel")
 	duel_buttons["duel_frigate"] = _button("Frigate duel")
-	column.append_array([duel_buttons["duel_sloop"], duel_buttons["duel_brig"], duel_buttons["duel_frigate"]])
+	duel_buttons["two_sloops"] = _button("Two-ship encounter — two sloops")
+	column.append_array([duel_buttons["duel_sloop"], duel_buttons["duel_brig"], duel_buttons["duel_frigate"], duel_buttons["two_sloops"]])
 	var guidance := Label.new()
 	guidance.text = GUIDANCE
 	guidance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -66,7 +68,7 @@ func _ready() -> void:
 	vessel_column.append_array([start_button, back_button])
 	_vessel_screen = _screen(vessel_column)
 
-	link_focus([sailing_button, quit_button] + duel_buttons.values())
+	link_focus([sailing_button] + duel_buttons.values() + [quit_button])
 	link_focus(vessel_buttons.values() + [start_button, back_button])
 	sailing_button.pressed.connect(_show_vessels.bind("practice"))
 	for preset_id in duel_buttons:

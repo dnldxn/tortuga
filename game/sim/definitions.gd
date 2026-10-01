@@ -77,6 +77,16 @@ const PRESETS := {
 			{"id": 2, "team": 1, "vessel_id": "frigate", "position": Vector2(3500, 2100), "heading": PI, "role": "ship"},
 		],
 	},
+	"two_sloops": {
+		"label": "Two-ship encounter",
+		"player_position": Vector2(2400, 2100),
+		"player_heading": 0.0,
+		"wind_heading": 0.0,
+		"opposition": [
+			{"id": 2, "team": 1, "vessel_id": "sloop", "position": Vector2(3400, 1700), "heading": PI, "role": "ship"},
+			{"id": 3, "team": 1, "vessel_id": "sloop", "position": Vector2(3400, 2500), "heading": PI, "role": "ship"},
+		],
+	},
 }
 
 

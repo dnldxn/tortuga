@@ -52,12 +52,16 @@ func show_result(sim) -> void:
 		lines.push_front(ESCAPE_REASON)
 	for d in sim.result["defeated"]:
 		var ship: Dictionary = sim.ships[d["ship_id"]]
-		var name := "Enemy A" if ship["team"] == 1 else "You"
+		var name := ("Sloop %s" % ("A" if d["ship_id"] == 2 else "B") if sim.ships.has(3) else "Enemy A") if ship["team"] == 1 else "You"
 		if d["reason"] == "sunk":
 			lines.append("%s (%s) sunk." % [name, Definitions.VESSELS[ship["vessel_id"]]["display_name"]])
 		else:
 			var cause := " and ".join(PackedStringArray(d["disabled_by"]))
 			lines.append("%s (%s) disabled: %s exhausted." % [name, Definitions.VESSELS[ship["vessel_id"]]["display_name"], cause])
+	if sim.ships.has(3):
+		for id in [2, 3]:
+			if sim.ships[id]["active"]:
+				lines.append("Sloop %s (Sloop) Active." % ("A" if id == 2 else "B"))
 	detail_label.text = "\n".join(lines)
 	visible = true
 	replay_button.grab_focus()

@@ -104,20 +104,17 @@ func _process(delta: float) -> void:
 	marker_canvas.queue_redraw()
 
 
-## Smoothed duel framing: zoom out to fit player and active enemy, center between
-## them clamped to the arena. Practice keeps zoom 1 on the player.
+## Smoothed framing around the player and all active enemies. Practice follows the player.
 func _fit_camera(delta: float) -> void:
 	var sim = main.sim
 	if not sim.ships.has(sim.PLAYER_ID):
 		return
-	var player: Vector2 = sim.ships[sim.PLAYER_ID]["position"]
-	var enemy: Variant = _active_enemy(sim)
 	var desired_zoom := 1.0
 	var screen := get_viewport_rect().size
-	if enemy != null:
-		var offset: Vector2 = enemy["position"] - player
-		desired_zoom = clampf(minf((screen.x - FIT_MARGIN_X) / (2.0 * maxf(absf(offset.x), 1.0)),
-			(screen.y - FIT_MARGIN_Y) / (2.0 * maxf(absf(offset.y), 1.0))), ZOOM_MIN, ZOOM_MAX)
+	var bounds: Variant = _active_bounds(sim)
+	if bounds != null:
+		desired_zoom = clampf(minf((screen.x - FIT_MARGIN_X) / (2.0 * maxf(bounds.size.x, 1.0)),
+			(screen.y - FIT_MARGIN_Y) / (2.0 * maxf(bounds.size.y, 1.0))), ZOOM_MIN, ZOOM_MAX)
 	camera.zoom = camera.zoom.lerp(Vector2.ONE * desired_zoom, 1.0 - exp(-ZOOM_SMOOTH * maxf(delta, 0.0)))
 	# Clamp the center so the viewport stays inside the arena where it is wider than it.
 	var half: Vector2 = screen / (2.0 * camera.zoom.x)
@@ -131,17 +128,21 @@ func _fit_camera(delta: float) -> void:
 	queue_redraw()
 
 
-## Lowest-ID active opposition ship in a duel (practice targets are not framed).
-func _active_enemy(sim) -> Variant:
+## Bounding box of player and active opposition; practice targets are not framed.
+func _active_bounds(sim) -> Variant:
 	if sim.preset_id == "practice":
 		return null
-	var best: Variant = null
+	var player: Vector2 = sim.ships[sim.PLAYER_ID]["position"]
+	var low := player
+	var high := player
+	var found := false
 	for id in sim.ships:
 		var ship: Dictionary = sim.ships[id]
 		if ship["team"] == sim.TEAM_OPPOSITION and ship["active"]:
-			if best == null or ship["id"] < best["id"]:
-				best = ship
-	return best
+			low = low.min(ship["position"])
+			high = high.max(ship["position"])
+			found = true
+	return Rect2(low, high - low) if found else null
 
 
 ## Reconciles ship nodes with sim.ships by stable id and points the camera at the player.
@@ -174,10 +175,10 @@ func sync(sim) -> void:
 
 func _desired_camera_center(sim) -> Vector2:
 	var player: Vector2 = sim.ships[sim.PLAYER_ID]["position"]
-	var enemy: Variant = _active_enemy(sim)
-	if enemy == null:
+	var bounds: Variant = _active_bounds(sim)
+	if bounds == null:
 		return player
-	return (player + enemy["position"]) / 2.0
+	return bounds.get_center()
 
 
 func _on_practice_started() -> void:
@@ -266,6 +267,17 @@ func _draw_combat() -> void:
 		draw_arc(p, r, 0, TAU, 32, TARGET_INK, 3.0)
 		var title := "TARGET · %s" % (" / ".join(ship["defeat_reasons"]).to_upper() if not ship["active"] else "BRIG")
 		_draw_text(font, p + Vector2(-50, -r - 12), title, TARGET_INK)
+	if sim.ships.has(3):
+		for id in [2, 3]:
+			var enemy: Dictionary = sim.ships[id]
+			if enemy["active"]:
+				var p: Vector2 = enemy["position"]
+				var ink := ENEMY_INK
+				if id == 2:
+					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -43), p + Vector2(-7, -32), p + Vector2(7, -32)]), ink)
+				else:
+					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -44), p + Vector2(-7, -37), p + Vector2(0, -30), p + Vector2(7, -37)]), ink)
+				_draw_text(font, p + Vector2(12, -30), "Sloop %s" % ("A" if id == 2 else "B"), ink)
 	for shot in sim.projectiles:
 		var p: Vector2 = shot["position"]
 		draw_circle(p, 5, Color.BLACK)
@@ -292,33 +304,81 @@ func _draw_combat() -> void:
 				_draw_text(font, p + Vector2(-32, -20), "DEFEATED", TARGET_INK)
 
 
+## The rectangle includes the four-pixel text outline; drawing uses this same placement.
+func marker_label_rect(sim, id: int, p: Vector2, center: Vector2, screen: Rect2) -> Rect2:
+	var target: Vector2 = sim.ships[id]["position"]
+	var direction := (target - center).normalized()
+	var label := _marker_label(sim, id)
+	var font := ThemeDB.fallback_font
+	var size := Vector2(font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x + 8, font.get_height(18) + 8)
+	var origin := p - direction * 45 + Vector2(-44, 1 - font.get_ascent(18))
+	return Rect2(origin.clamp(screen.position + Vector2(4, 4), screen.end - size - Vector2(4, 4)), size)
+
+
+func _marker_label(sim, id: int) -> String:
+	var label := "TARGET" if sim.preset_id == "practice" else "Enemy A"
+	if sim.ships.has(3):
+		label = "Sloop %s" % ("A" if id == 2 else "B")
+	if sim.preset_id != "practice":
+		label += " · %d" % roundi(sim.ships[id]["position"].distance_to(sim.ships[sim.PLAYER_ID]["position"]))
+	return label
+
+
+## Stable-ID edge placements; separate measured labels and arrow points along the edge.
+func enemy_markers(sim, center: Vector2, screen: Rect2) -> Dictionary:
+	var positions := {}
+	var ids: Array = sim.ships.keys()
+	ids.sort()
+	var safe := screen.grow(-MARKER_INSET)
+	for id in ids:
+		var enemy: Dictionary = sim.ships[id]
+		if enemy["team"] != sim.TEAM_OPPOSITION or not enemy["active"]:
+			continue
+		var marker := target_marker(center, enemy["position"], screen)
+		if not marker["offscreen"]:
+			continue
+		var p: Vector2 = marker["position"]
+		for other_id in positions:
+			var other: Vector2 = positions[other_id]
+			var previous := marker_label_rect(sim, other_id, other, center, screen)
+			var current := marker_label_rect(sim, id, p, center, screen)
+			if p.distance_to(other) < 24.0 or current.intersects(previous):
+				var vertical := is_equal_approx(p.x, safe.position.x) or is_equal_approx(p.x, safe.end.x)
+				var step := maxf(24.0, maxf(current.size.y, previous.size.y) + 4.0) if vertical else maxf(24.0, maxf(current.size.x, previous.size.x) + 4.0)
+				for sign in [1.0, -1.0]:
+					var candidate := p + (Vector2(0, sign * step) if vertical else Vector2(sign * step, 0))
+					candidate = candidate.clamp(safe.position, safe.end)
+					if candidate.distance_to(other) >= 24.0 and not marker_label_rect(sim, id, candidate, center, screen).intersects(previous):
+						p = candidate
+						break
+		positions[id] = p
+	return positions
+
+
 func _draw_marker() -> void:
 	if main == null or main.sim.ships.is_empty():
 		return
 	var sim = main.sim
-	var enemy = _active_enemy(sim)
-	if enemy == null:
-		return
 	var screen := Rect2(Vector2.ZERO, marker_canvas.size)
-	var target: Vector2 = enemy["position"]
-	var center := camera.get_screen_center_position()  # actual center after limit clamping
-	var marker := target_marker(center, target, screen)
-	if not marker["offscreen"]:
-		return  # on-screen enemies need no arrow
-	var p: Vector2 = marker["position"]
-	var direction: Vector2 = (target - center).normalized()
-	var across := direction.orthogonal()
-	var ink := ENEMY_INK if sim.preset_id != "practice" else TARGET_INK
-	marker_canvas.draw_colored_polygon(PackedVector2Array([p + direction * 14, p - direction * 8 + across * 9,
-		p - direction * 8 - across * 9]), ink)
-	var label := "Enemy A"
-	if sim.preset_id == "practice":
-		label = "TARGET"
-	else:
-		label += " · %d" % roundi(target.distance_to(sim.ships[sim.PLAYER_ID]["position"]))
-	var label_pos := p - direction * 45 + Vector2(-40, 5)
-	marker_canvas.draw_string_outline(ThemeDB.fallback_font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 4, Color.BLACK)
-	marker_canvas.draw_string(ThemeDB.fallback_font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ink)
+	var center := camera.get_screen_center_position()
+	var markers := enemy_markers(sim, center, screen)
+	for id in markers:
+		var target: Vector2 = sim.ships[id]["position"]
+		var p: Vector2 = markers[id]
+		var direction: Vector2 = (target - center).normalized()
+		var across := direction.orthogonal()
+		var ink := ENEMY_INK if sim.preset_id != "practice" else TARGET_INK
+		if sim.ships.has(3) and id == 3:
+			marker_canvas.draw_colored_polygon(PackedVector2Array([p + direction * 14, p + across * 10,
+				p - direction * 14, p - across * 10]), ink)
+		else:
+			marker_canvas.draw_colored_polygon(PackedVector2Array([p + direction * 14, p - direction * 8 + across * 9,
+				p - direction * 8 - across * 9]), ink)
+		var label := _marker_label(sim, id)
+		var rect := marker_label_rect(sim, id, p, center, screen)
+		var label_pos := rect.position + Vector2(4, ThemeDB.fallback_font.get_ascent(18) + 4)
+		marker_canvas.draw_string_outline(ThemeDB.fallback_font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 4, Color.BLACK)
+		marker_canvas.draw_string(ThemeDB.fallback_font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, ink)
 
 
 func _draw_text(font: Font, p: Vector2, text: String, ink: Color) -> void:

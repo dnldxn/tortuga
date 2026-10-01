@@ -46,6 +46,7 @@ func commands_for_tick(observation: Dictionary, dt: float) -> Dictionary:
 	for id in ids:
 		var ship: Dictionary = observation["ships"][id]
 		if not ship.get("active", false) or ship.get("team") != NavalSimulation.TEAM_OPPOSITION:
+			_memory.erase(id)
 			continue
 		var target := _target_for(observation, ship)
 		if target.is_empty():
@@ -127,7 +128,9 @@ func _avoidance_heading(observation: Dictionary, ship: Dictionary, memory: ShipM
 		if inward == Vector2.ZERO:
 			inward = Vector2.RIGHT
 		return {"heading": inward.angle(), "kind": "boundary"}
-	for other_id in observation["ships"]:
+	var ids: Array = observation["ships"].keys()
+	ids.sort()
+	for other_id in ids:
 		if other_id == ship["id"]:
 			continue
 		var other: Dictionary = observation["ships"][other_id]
@@ -143,7 +146,7 @@ func _avoidance_heading(observation: Dictionary, ship: Dictionary, memory: ShipM
 		var t := 0.0 if denom < 0.001 else clampf(-relative.dot(closing) / denom, 0.0, Definitions.AI["look_ahead_s"])
 		var other_radius: float = Definitions.VESSELS[other["vessel_id"]]["radius"]
 		var predicted: Vector2 = relative + closing * t
-		if t > 0.0 and predicted.length() < radius + other_radius + Definitions.AI["ship_clearance"] \
+		if predicted.length() < radius + other_radius + Definitions.AI["ship_clearance"] \
 				or relative.length() <= radius + other_radius + Definitions.AI["contact_margin"]:
 			# Steer away perpendicular, biased outward from the obstacle.
 			var away: Vector2 = (ship["position"] - other["position"]).normalized()
@@ -281,8 +284,33 @@ func _select_ammo(command: Dictionary, observation: Dictionary, ship: Dictionary
 		var ammo_range: float = Definitions.AMMO[observed["ammo"]]["range"]
 		var bearing_error := absf(Definitions.wrap_angle(target_bearing - broadsides[side]))
 		if observed["ready"] >= 1 and distance <= ammo_range \
-				and bearing_error <= Definitions.AI["fire_bearing"]:
+				and bearing_error <= Definitions.AI["fire_bearing"] \
+				and not _ally_blocks_fire(observation, ship, target, side, ammo_range):
 			command["fire_" + side] = true
+
+
+## Aim and muzzle use the same current centers as NavalSimulation. Its pure swept-circle
+## query checks only the current lane; allies that move after launch still take hits.
+func _ally_blocks_fire(observation: Dictionary, ship: Dictionary, target: Dictionary, side: String, ammo_range: float) -> bool:
+	var start: Vector2 = ship["position"]
+	var direction: Vector2 = (target["position"] - start).normalized()
+	var broadside: float = ship["heading"] + (-PI / 2.0 if side == "port" else PI / 2.0)
+	if absf(Definitions.wrap_angle(direction.angle() - broadside)) > Definitions.ARC_HALF_ANGLE:
+		direction = Vector2.from_angle(broadside)
+	var end: Vector2 = start + direction * ammo_range
+	var target_radius: float = Definitions.VESSELS[target["vessel_id"]]["radius"]
+	var target_t := NavalSimulation.segment_circle(start, end, target["position"], target_radius)
+	if target_t < 0.0:
+		return false
+	for other_id in observation["ships"]:
+		var other: Dictionary = observation["ships"][other_id]
+		if other_id == ship["id"] or not other["active"] or other["team"] != ship["team"]:
+			continue
+		var radius: float = Definitions.VESSELS[other["vessel_id"]]["radius"]
+		var ally_t := NavalSimulation.segment_circle(start, end, other["position"], radius)
+		if ally_t >= 0.0 and ally_t < target_t:
+			return true
+	return false
 
 
 ## Ordered candidate rules; distance alone never authorizes firing.
