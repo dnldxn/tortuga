@@ -1,9 +1,10 @@
 extends Control
-## Mode select (practice / duels / two sloops / Quit) -> vessel select.
+## Mode select (practice / duels / two sloops / Settings / Quit) -> vessel select.
 ## start_requested carries the chosen preset id and vessel id.
 
 signal start_requested(preset_id: String, vessel_id: String)
 signal quit_requested
+signal settings_requested
 
 const Definitions := preload("res://sim/definitions.gd")
 
@@ -18,7 +19,9 @@ const GUIDANCE := "Sink the enemy, or exhaust its sails or crew. Turn a broadsid
 
 var sailing_button: Button
 var duel_buttons := {}  # preset id -> Button
+var settings_button: Button
 var quit_button: Button
+var notice_label: Label
 var start_button: Button
 var back_button: Button
 var vessel_buttons := {}  # vessel_id -> toggle Button
@@ -46,8 +49,14 @@ func _ready() -> void:
 	guidance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	guidance.custom_minimum_size = Vector2(420, 0)
 	column.append(guidance)
+	notice_label = Label.new()  # settings load-fallback notice; hidden when empty
+	notice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	notice_label.custom_minimum_size = Vector2(420, 0)
+	notice_label.hide()
+	column.append(notice_label)
+	settings_button = _button("Settings")
 	quit_button = _button("Quit")
-	column.append(quit_button)
+	column.append_array([settings_button, quit_button])
 	_mode_screen = _screen(column)
 
 	var heading := Label.new()
@@ -68,11 +77,12 @@ func _ready() -> void:
 	vessel_column.append_array([start_button, back_button])
 	_vessel_screen = _screen(vessel_column)
 
-	link_focus([sailing_button] + duel_buttons.values() + [quit_button])
+	link_focus([sailing_button] + duel_buttons.values() + [settings_button, quit_button])
 	link_focus(vessel_buttons.values() + [start_button, back_button])
 	sailing_button.pressed.connect(_show_vessels.bind("practice"))
 	for preset_id in duel_buttons:
 		duel_buttons[preset_id].pressed.connect(_show_vessels.bind(preset_id))
+	settings_button.pressed.connect(settings_requested.emit)
 	quit_button.pressed.connect(quit_requested.emit)
 	back_button.pressed.connect(show_mode_select)
 	start_button.pressed.connect(func(): start_requested.emit(_chosen_preset, selected_vessel_id()))
@@ -82,6 +92,11 @@ func show_mode_select() -> void:
 	_vessel_screen.hide()
 	_mode_screen.show()
 	sailing_button.grab_focus()
+
+
+func show_notice(text: String) -> void:
+	notice_label.text = text
+	notice_label.visible = text != ""
 
 
 func selected_vessel_id() -> String:

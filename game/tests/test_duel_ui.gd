@@ -103,8 +103,9 @@ func _test_two_sloop_ui(t) -> void:
 	if not sel.duel_buttons.has("two_sloops"):
 		return
 	t.check(sel.duel_buttons["duel_frigate"].focus_neighbor_bottom == sel.duel_buttons["duel_frigate"].get_path_to(sel.duel_buttons["two_sloops"])
-		and sel.duel_buttons["two_sloops"].focus_neighbor_bottom == sel.duel_buttons["two_sloops"].get_path_to(sel.quit_button),
-		"keyboard focus reaches fourth preset then Quit in visual order")
+		and sel.duel_buttons["two_sloops"].focus_neighbor_bottom == sel.duel_buttons["two_sloops"].get_path_to(sel.settings_button)
+		and sel.settings_button.focus_neighbor_bottom == sel.settings_button.get_path_to(sel.quit_button),
+		"keyboard focus reaches fourth preset, Settings, then Quit in visual order")
 	sel.duel_buttons["two_sloops"].pressed.emit()
 	sel.vessel_buttons["frigate"].button_pressed = true
 	sel.start_button.pressed.emit()

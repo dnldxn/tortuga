@@ -1,10 +1,11 @@
 extends Control
-## Pause overlay: Resume / Restart practice / Return to selection, plus the sailing help
+## Pause overlay: Resume / Restart practice / Settings / Return to selection, plus the sailing help
 ## (guidance, ammo tracks, live key bindings) kept off the in-play HUD.
 
 signal resume_requested
 signal restart_requested
 signal return_requested
+signal settings_requested
 
 const SelectionMenu := preload("res://ui/selection_menu.gd")
 const Bindings := preload("res://input_bindings.gd")
@@ -16,6 +17,7 @@ const AMMO_HELP := "Round: hull / Chain: sails / Grape: crew · Changing ammo re
 
 var resume_button: Button
 var restart_button: Button
+var settings_button: Button
 var return_button: Button
 var guidance_label: Label
 var bindings_label: Label
@@ -38,6 +40,7 @@ func _ready() -> void:
 	box.add_child(title)
 	resume_button = _button(box, "Resume", resume_requested)
 	restart_button = _button(box, "Restart practice", restart_requested)
+	settings_button = _button(box, "Settings", settings_requested)
 	return_button = _button(box, "Return to selection", return_requested)
 	panel.add_child(box)
 	var column := VBoxContainer.new()
@@ -55,7 +58,7 @@ func _ready() -> void:
 	column.add_child(help_panel)
 	center.add_child(column)
 	add_child(center)
-	SelectionMenu.link_focus([resume_button, restart_button, return_button])
+	SelectionMenu.link_focus([resume_button, restart_button, settings_button, return_button])
 
 
 ## Refreshed on every pause so guidance matches the encounter and bindings are live.

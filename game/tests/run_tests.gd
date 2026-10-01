@@ -1,6 +1,7 @@
 extends SceneTree
 ## Dependency-free headless test runner.
-## Usage: godot --headless --path game --script res://tests/run_tests.gd [-- --self-test-failure]
+## Usage: bash game/tests/run_settings_checks.sh [--self-test-failure]
+## (wraps godot --headless --path game --script res://tests/run_tests.gd with isolated user data)
 
 ## Explicit suite registry: add one path per suite. Each script exposes `func run(t) -> bool`
 ## and returns true at the end, so a suite aborted by a runtime error counts as a failure.
@@ -19,11 +20,31 @@ const SUITES: Array[String] = [
 	"res://tests/test_two_opponent.gd",
 	"res://tests/test_combat_roster.gd",
 	"res://tests/test_two_opponent_escape.gd",
+	"res://tests/test_settings.gd",
+	"res://tests/test_settings_ui.gd",
 ]
+
+const ISOLATION_MESSAGE := "Settings tests require isolated user data. Run: bash game/tests/run_settings_checks.sh"
 
 var checks := 0
 var failures := 0
 var _started := false
+
+
+## True only when user:// lives under a nonempty absolute $TORTUGA_TEST_ROOT, so tests can never
+## read or write the real player profile. Shared with tests/settings_process_probe.gd.
+static func isolated_user_data_ok() -> bool:
+	var root := OS.get_environment("TORTUGA_TEST_ROOT").simplify_path()
+	if root.is_empty() or not root.is_absolute_path():
+		return false
+	return OS.get_user_data_dir().simplify_path().begins_with(root + "/")
+
+
+func _initialize() -> void:
+	if not isolated_user_data_ok():
+		_started = true
+		print(ISOLATION_MESSAGE)
+		quit(1)
 
 
 ## Suites run on the first frame (not in _initialize) so `root` is inside the tree and

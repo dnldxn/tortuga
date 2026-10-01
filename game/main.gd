@@ -16,6 +16,8 @@ const SelectionMenu := preload("res://ui/selection_menu.gd")
 const PauseMenu := preload("res://ui/pause_menu.gd")
 const ResultMenu := preload("res://ui/result_menu.gd")
 const Hud := preload("res://ui/hud.gd")
+const Settings := preload("res://settings.gd")
+const SettingsMenu := preload("res://ui/settings_menu.gd")
 
 const DT := 1.0 / 60.0
 const PRESET := "practice"
@@ -26,12 +28,14 @@ const EDGE_ACTIONS := ["fire_port", "fire_starboard", "cycle_port", "cycle_starb
 var sim = NavalSimulation.new()
 var ai = AIController.new()
 var mode := "selection"
+var settings = Settings.new()
 
 @onready var arena_view: Node2D = $ArenaView
 var selection: Control
 var hud: Control
 var pause_menu: Control
 var result_menu: Control
+var settings_menu: Control
 
 var _held := {}  # turn actions freshly pressed while sailing and not yet released
 var _toggle_queued := false  # parity of non-echo toggle presses since the last tick
@@ -41,12 +45,15 @@ var _reset_queued := false  # reset_practice pressed since the last tick
 
 func _ready() -> void:
 	Bindings.install_defaults()
+	settings.load_settings()
+	settings.apply_values(settings.values)
 	var theme := _make_theme()
 	hud = Hud.new()
 	pause_menu = PauseMenu.new()
 	result_menu = ResultMenu.new()
 	selection = SelectionMenu.new()
-	for control in [hud, pause_menu, result_menu, selection]:
+	settings_menu = SettingsMenu.new()
+	for control in [hud, pause_menu, result_menu, selection, settings_menu]:
 		control.theme = theme
 		$UI.add_child(control)
 	selection.start_requested.connect(start_encounter)
@@ -56,6 +63,11 @@ func _ready() -> void:
 	pause_menu.return_requested.connect(return_to_selection)
 	result_menu.replay_requested.connect(restart_practice)
 	result_menu.return_requested.connect(return_to_selection)
+	selection.settings_requested.connect(open_settings)
+	pause_menu.settings_requested.connect(open_settings)
+	settings_menu.closed.connect(close_settings)
+	settings.changed.connect(_on_settings_changed)
+	selection.show_notice(settings.notice)
 	_enter_mode("selection")
 
 
@@ -137,9 +149,45 @@ func set_paused(value: bool) -> void:
 		_enter_mode("sailing")
 
 
+## Overlays the settings menu on the selection or pause menu. No reset, no resume.
+func open_settings() -> void:
+	if mode not in ["selection", "paused"] or settings_menu.visible:
+		return
+	_clear_input()
+	selection.visible = false
+	pause_menu.visible = false
+	settings_menu.open(settings)
+
+
+## Restores the source menu and focuses its Settings button.
+func close_settings() -> void:
+	_clear_input()
+	settings_menu.visible = false
+	var source: Control = pause_menu if mode == "paused" else selection
+	source.visible = true
+	source.settings_button.grab_focus()
+
+
+## Live prompts follow applied bindings; the load notice clears once a save succeeds.
+func _on_settings_changed() -> void:
+	selection.show_notice(settings.notice)
+	if mode == "paused":
+		pause_menu.show_help(sim)
+
+
+## Settings gets every event first while open (capture, then Escape = Back); gameplay sees none.
 ## Release events are observed in every mode; presses count only while sailing.
 ## Keys held across a transition stay inert until released and pressed again.
 func _input(event: InputEvent) -> void:
+	if settings_menu.visible:
+		var consumed: bool = settings_menu.handle_capture(event)
+		if not consumed and event is InputEventKey and event.pressed and not event.echo \
+				and event.keycode == KEY_ESCAPE:
+			settings_menu.back()
+			consumed = true
+		if consumed:
+			get_viewport().set_input_as_handled()
+		return
 	if not event is InputEventKey:
 		return  # mouse never steers
 	for action in TURN_ACTIONS:
@@ -164,6 +212,7 @@ func _input(event: InputEvent) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		_clear_input()
+		settings_menu.release_all()
 		set_paused(true)  # focus-in deliberately never resumes
 
 
