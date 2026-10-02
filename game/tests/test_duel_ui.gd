@@ -124,12 +124,10 @@ func _test_two_sloop_ui(t) -> void:
 	main.sim.ships[2]["position"] = Vector2(3000, 2400)
 	main.sim.ships[3]["position"] = Vector2(3000, 2600)
 	hud.refresh(main.sim)
-	t.check("Sloop A" in hud.aim_labels["starboard"].text, "assisted broadside identifies Sloop A")
 	main.sim.ships[2]["active"] = false
 	main.sim.ships[2]["defeat_reasons"] = ["sails", "crew"]
 	main.sim.ships[3]["hull"] = 40.0
 	hud.refresh(main.sim)
-	t.check("Sloop B" in hud.aim_labels["starboard"].text, "assisted target updates to surviving Sloop B")
 	t.check("SAILS" in _all_text(hud) and "CREW" in _all_text(hud)
 		and "1 of 2 enemies defeated" in _all_text(hud), "HUD retains both defeat reasons and combat notice")
 	t.check("DISABLED" in hud.target_state_label.text and hud.second_target_stats["hull"][1].text == "40/100",

@@ -422,19 +422,20 @@ func _test_cycle_realization(t) -> void:
 	t.check(resumed, "aligned ready side fires after reaching goal")
 
 
-## One ready gun and 8-degree bearing fires; 13 degrees, out of range, no ready guns
-## or inactive target do not.
+## One ready gun and 3-degree bearing fires; 6 degrees (outside the 4-degree gate), out
+## of range, no ready guns or inactive target do not.
 func _test_fire_gating(t) -> void:
 	var obs := _full_observation()
 	obs["ships"][1]["position"] = Vector2(3400, 2100)  # 400 east: within round's 900 range
 	obs["ships"][2]["sides"]["port"]["ready"] = 1
+	obs["ships"][2]["heading"] = PI / 2.0 + 3.0 * PI / 180.0  # 3 degrees off the broadside
 	var fired := _enemy_command(obs)
-	t.check(fired.get("fire_port", false), "one ready gun at 8-degree bearing fires")
+	t.check(fired.get("fire_port", false), "one ready gun at 3-degree bearing fires")
 	var wide := _full_observation()
 	wide["ships"][1]["position"] = Vector2(3400, 2100)
 	wide["ships"][2]["sides"]["port"]["ready"] = 1
-	wide["ships"][2]["heading"] = PI / 2.0 + 13.0 * PI / 180.0  # 13 degrees off the broadside
-	t.check(not _enemy_command(wide).get("fire_port", false), "13-degree bearing does not fire")
+	wide["ships"][2]["heading"] = PI / 2.0 + 6.0 * PI / 180.0  # 6 degrees off the broadside
+	t.check(not _enemy_command(wide).get("fire_port", false), "6-degree bearing does not fire")
 	var far := _full_observation()
 	far["ships"][1]["position"] = Vector2(4500, 2100)  # 1500: outside every range
 	far["ships"][2]["sides"]["port"]["ready"] = 6

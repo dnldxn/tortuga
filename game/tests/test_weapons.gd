@@ -1,5 +1,5 @@
 extends RefCounted
-## Weapon state, per-gun reload, firing/cycling order and aim-assist checks.
+## Weapon state, per-gun reload, firing/cycling order and straight-broadside gun spread checks.
 
 const Definitions := preload("res://sim/definitions.gd")
 const NavalSimulation := preload("res://sim/naval_simulation.gd")
@@ -19,11 +19,10 @@ func run(t) -> bool:
 	_test_both_sides_and_missing(t)
 	_test_projectile_id_order(t)
 	_test_crew_rate(t)
-	_test_aim_selection(t)
-	_test_aim_edges(t)
-	_test_aim_wrap(t)
-	_test_aim_exclusion_and_reasons(t)
-	_test_aim_tie(t)
+	_test_gun_offsets(t)
+	_test_gun_spread(t)
+	_test_no_aim_assist(t)
+	_test_fire_replay(t)
 	_test_unaimed_fire(t)
 	return true
 
@@ -72,12 +71,12 @@ func _vec_near(a: Vector2, b: Vector2, eps: float) -> bool:
 # --- definitions / reload math -------------------------------------------------
 
 func _test_definitions(t) -> void:
-	var expected := {"round": [900.0, 432.0, 8.0, "hull"], "chain": [600.0, 360.0, 6.0, "sails"], "grape": [300.0, 324.0, 5.0, "crew"]}
+	var expected := {"round": [900.0, 345.6, 8.0, "hull"], "chain": [600.0, 288.0, 6.0, "sails"], "grape": [300.0, 259.2, 5.0, "crew"]}
 	for ammo in expected:
 		var a: Dictionary = Definitions.AMMO.get(ammo, {})
 		t.check([a.get("range"), a.get("speed"), a.get("damage"), a.get("track")] == expected[ammo], "%s ammo definition" % ammo)
 	t.check(Definitions.AMMO_CYCLE == ["round", "chain", "grape"], "ammo cycle order")
-	t.near(rad_to_deg(Definitions.ARC_HALF_ANGLE), 12.0, 1e-9, "arc half-angle 12 degrees")
+	t.near(Definitions.GUN_SPREAD, 0.7, 1e-12, "guns span +/-0.7 radius along the keel")
 
 
 func _test_durations(t) -> void:
@@ -204,77 +203,70 @@ func _test_crew_rate(t) -> void:
 		t.near(_loads(sim, 1, "port")[0], DT * rate / 4.55, EPS, "gun 0 next tick after firing, crew %s" % crew)
 
 
-# --- aim ------------------------------------------------------------------------
+# --- straight broadsides (no aim assist) ------------------------------------------
 
-func _test_aim_selection(t) -> void:
-	var list := [_enemy(2, Vector2(2500, 1700)), _enemy(3, Vector2(2500, 1600)), _enemy(4, Vector2(2650, 2100))]
-	for reverse in [false, true]:
-		var sim = _sim_with(list.duplicate(true), reverse)
-		var aim: Dictionary = sim.aim_for(1, "port")
-		t.check(aim["target_id"] == 2 and aim["reason"] == "assisted", "round port selects nearer north target (reverse=%s)" % reverse)
-		t.check(_vec_near(aim["direction"], Vector2(0, -1), 1e-6) and aim["range"] == 900.0, "assisted direction/range (reverse=%s)" % reverse)
-		sim.ships[1]["weapons"]["port"]["ammo"] = "grape"
-		aim = sim.aim_for(1, "port")
-		t.check(aim["target_id"] == null and aim["reason"] == "out_of_range" and aim["range"] == 300.0, "grape selects neither (reverse=%s)" % reverse)
-		t.check(_vec_near(aim["direction"], Vector2(0, -1), 1e-6), "unassisted aim is perpendicular (reverse=%s)" % reverse)
-	# The practice target position due east starts outside both arcs.
-	var east = _sim_with([_enemy(2, Vector2(3000, 2100))])
-	t.check(east.aim_for(1, "port")["reason"] == "outside_arc" and east.aim_for(1, "starboard")["reason"] == "outside_arc", "due-east target outside both arcs")
+func _test_gun_offsets(t) -> void:
+	t.near(NavalSimulation.gun_offset(0, 4, 27.5), 19.25, 1e-9, "sloop gun 0 sits 0.7r toward the bow")
+	t.near(NavalSimulation.gun_offset(1, 4, 27.5), 19.25 / 3.0, 1e-9, "sloop gun 1 evenly spaced")
+	t.near(NavalSimulation.gun_offset(2, 4, 27.5), -19.25 / 3.0, 1e-9, "sloop gun 2 evenly spaced")
+	t.near(NavalSimulation.gun_offset(3, 4, 27.5), -19.25, 1e-9, "sloop gun 3 sits 0.7r toward the stern")
+	t.near(NavalSimulation.gun_offset(7, 8, 42.5), -29.75, 1e-9, "frigate last gun at -0.7r")
 
 
-func _test_aim_edges(t) -> void:
-	var edge := deg_to_rad(12.0)
-	var tiny := deg_to_rad(0.001)
+## Every loaded gun fires from its own place along the keel, straight off the beam.
+func _test_gun_spread(t) -> void:
+	for vessel_id in VESSEL_IDS:
+		var vessel: Dictionary = Definitions.VESSELS[vessel_id]
+		var n: int = vessel["guns_per_side"]
+		for heading in [0.0, 0.7, -2.5]:
+			for side in ["port", "starboard"]:
+				var sim = _sim(vessel_id)
+				sim.ships = {1: sim.ships[1]}
+				sim.ships[1]["heading"] = heading
+				sim.step(DT, {1: {"fire_" + side: true}})
+				var center: Vector2 = sim.ships[1]["position"]  # fire uses the post-movement center
+				var fired_heading: float = sim.ships[1]["heading"]  # wrap_angle may move the last bit
+				var keel := Vector2.from_angle(fired_heading)
+				var beam := Vector2.from_angle(fired_heading + (-PI / 2.0 if side == "port" else PI / 2.0))
+				var shots := _of_type(sim, "shot")
+				var ok: bool = shots.size() == n and sim.projectiles.size() == n
+				for k in shots.size():
+					var offset: Vector2 = shots[k]["position"] - center
+					ok = ok and absf(offset.dot(keel) - NavalSimulation.gun_offset(k, n, vessel["radius"])) <= 1e-3
+					ok = ok and absf(offset.dot(beam)) <= 1e-3
+					ok = ok and shots[k]["direction"] == beam and sim.projectiles[k]["direction"] == beam
+				var label := "%s heading %s %s" % [vessel_id, heading, side]
+				t.check(ok, "%s: %d shots spread bow to stern, all straight off the beam" % [label, n])
+	var partial = _sim()
+	partial.ships[1]["weapons"]["port"]["loads"] = [1.0, 0.4, 1.0, 0.8]
+	partial.step(DT, {1: {"fire_port": true}})
+	var center: Vector2 = partial.ships[1]["position"]
+	var shots := _of_type(partial, "shot")
+	t.check(shots.size() == 2 and absf(shots[0]["position"].x - center.x - 19.25) <= 1e-3
+		and absf(shots[1]["position"].x - center.x + 19.25 / 3.0) <= 1e-3,
+		"partial volley: guns 0 and 2 fire from their own places")
+
+
+func _test_no_aim_assist(t) -> void:
 	var port := -PI / 2.0
-	var cases := [
-		[Vector2(2500, 1200), 2, "range edge 900 inclusive"],
-		[Vector2(2500, 1199.9), null, "just beyond range"],
-		[SHOOTER + Vector2.from_angle(port + edge - tiny) * 500.0, 2, "inside +arc edge"],
-		[SHOOTER + Vector2.from_angle(port - edge + tiny) * 500.0, 2, "inside -arc edge"],
-		[SHOOTER + Vector2.from_angle(port + edge + tiny) * 500.0, null, "just outside +arc"],
-		[SHOOTER + Vector2.from_angle(port - edge - tiny) * 500.0, null, "just outside -arc"],
-	]
-	for c in cases:
-		var sim = _sim_with([_enemy(2, c[0])])
-		t.check(sim.aim_for(1, "port")["target_id"] == c[1], "aim: %s" % c[2])
+	for degrees in [0.0, 8.0, -8.0]:
+		var sim = _sim_with([_enemy(2, SHOOTER + Vector2.from_angle(port + deg_to_rad(degrees)) * 400.0)])
+		sim.step(DT, {1: {"fire_port": true}})
+		t.check(sim.projectiles.size() == 4 and sim.projectiles.all(func(p): return p["direction"] == Vector2.from_angle(port)),
+			"enemy %s degrees off the beam does not bend any shot" % degrees)
 
 
-func _test_aim_wrap(t) -> void:
-	for heading in [PI - 0.01, -PI + 0.01, 3.0 * PI / 2.0 - 0.01]:
-		for side in ["port", "starboard"]:
-			var broadside: float = heading + (-PI / 2.0 if side == "port" else PI / 2.0)
-			var target := SHOOTER + Vector2.from_angle(broadside + deg_to_rad(10.0)) * 400.0
-			var sim = _sim_with([_enemy(2, target)])
-			sim.ships[1]["heading"] = Definitions.wrap_angle(heading)
-			var aim: Dictionary = sim.aim_for(1, side)
-			t.check(aim["target_id"] == 2, "aim wraps heading %s %s" % [heading, side])
-
-
-func _test_aim_exclusion_and_reasons(t) -> void:
-	var north := Vector2(2500, 1700)
-	t.check(_sim_with([]).aim_for(1, "port")["reason"] == "no_active_enemy", "no ships: no_active_enemy")
-	var ally = _sim_with([_enemy(2, north, "brig", 0)])
-	t.check(ally.aim_for(1, "port")["reason"] == "no_active_enemy", "ally in arc ignored")
-	var dead = _sim_with([_enemy(2, north)])
-	dead.ships[2]["active"] = false
-	t.check(dead.aim_for(1, "port")["reason"] == "no_active_enemy", "inactive enemy ignored")
-	var mixed = _sim_with([_enemy(2, north, "brig", 0), _enemy(3, Vector2(2500, 1300)), _enemy(4, Vector2(2600, 2100))])
-	var aim: Dictionary = mixed.aim_for(1, "port")
-	t.check(aim["target_id"] == 3, "enemy behind nearer ally still selected (aim ignores blockers)")
-	var precedence = _sim_with([_enemy(2, Vector2(2500, 1100)), _enemy(3, Vector2(2600, 2100))])
-	t.check(precedence.aim_for(1, "port")["reason"] == "out_of_range", "in-arc beyond range beats outside-arc")
-	var only_out = _sim_with([_enemy(3, Vector2(2600, 2100))])
-	t.check(only_out.aim_for(1, "port")["reason"] == "outside_arc", "only out-of-arc enemy: outside_arc")
-	var near_bad = _sim_with([_enemy(2, Vector2(2560, 2080)), _enemy(3, Vector2(2500, 1500))])
-	t.check(near_bad.aim_for(1, "port")["target_id"] == 3, "nearer ineligible cannot steal aim")
-
-
-func _test_aim_tie(t) -> void:
-	for reverse in [false, true]:
-		var sim = _sim_with([_enemy(3, Vector2(2540, 1700)), _enemy(2, Vector2(2460, 1700))], reverse)
-		t.check(sim.aim_for(1, "port")["target_id"] == 2, "equal distance picks lower ID (reverse=%s)" % reverse)
-		var swapped = _sim_with([_enemy(3, Vector2(2460, 1700)), _enemy(2, Vector2(2540, 1700))], reverse)
-		t.check(swapped.aim_for(1, "port")["target_id"] == 2, "equal distance picks lower ID, positions swapped (reverse=%s)" % reverse)
+func _test_fire_replay(t) -> void:
+	var tape := []
+	for i in 240:
+		tape.append({1: {"turn": sin(i * 0.05), "fire_port": i % 50 == 0, "fire_starboard": i % 70 == 5}})
+	var runs := []
+	for run in 2:
+		var sim = _sim("frigate")
+		for command in tape:
+			sim.step(DT, command)
+		runs.append([sim.projectiles.duplicate(true), sim.ships.duplicate(true), sim.next_projectile_id])
+	t.check(runs[0] == runs[1] and runs[0][2] > 1, "identical fire tapes give identical projectiles and ships")
 
 
 func _test_unaimed_fire(t) -> void:

@@ -245,36 +245,10 @@ func ai_observation() -> Dictionary:
 	return {"ships": observed}
 
 
-## Read-only aim assist shared by firing and HUD. Nearest active enemy center within the
-## selected ammo range and ARC_HALF_ANGLE of the broadside; equal distances pick the lower ID.
-## Otherwise direction is exactly perpendicular and reason explains why.
-func aim_for(ship_id: int, side: String) -> Dictionary:
-	var shooter: Dictionary = ships[ship_id]
-	var ammo_range: float = Definitions.AMMO[shooter["weapons"][side]["ammo"]]["range"]
-	var broadside: float = shooter["heading"] + (-PI / 2.0 if side == "port" else PI / 2.0)
-	var aim := {"target_id": null, "direction": Vector2.from_angle(broadside), "range": ammo_range, "reason": "no_active_enemy"}
-	var best := INF
-	var ids := ships.keys()
-	ids.sort()
-	for id in ids:
-		var other: Dictionary = ships[id]
-		if not other["active"] or other["team"] == shooter["team"]:
-			continue
-		if aim["reason"] == "no_active_enemy":
-			aim["reason"] = "outside_arc"
-		var delta: Vector2 = other["position"] - shooter["position"]
-		var distance := delta.length()
-		if absf(Definitions.wrap_angle(delta.angle() - broadside)) > Definitions.ARC_HALF_ANGLE:
-			continue
-		if distance > ammo_range:
-			if aim["target_id"] == null:
-				aim["reason"] = "out_of_range"
-		elif distance < best and distance > 0.0:
-			best = distance
-			aim["target_id"] = id
-			aim["direction"] = delta / distance
-			aim["reason"] = "assisted"
-	return aim
+## Signed distance of gun i of n (0-based) from the ship center along the heading:
+## +GUN_SPREAD * radius at the bow (gun 0) to -GUN_SPREAD * radius at the stern.
+static func gun_offset(i: int, n: int, radius: float) -> float:
+	return radius * Definitions.GUN_SPREAD * (1.0 - 2.0 * float(i) / float(n - 1))
 
 
 func _cycle(weapon: Dictionary) -> void:
@@ -294,26 +268,29 @@ func _reload(ship: Dictionary, dt: float) -> void:
 			loads[i] = minf(1.0, loads[i] + dt * rate / reload_duration(i, n, vessel["base_reload"]))
 
 
-## Every exactly-full gun fires one shot from the ship center along the shared aim direction.
+## Every exactly-full gun fires one shot from its own place along the keel (gun_offset),
+## straight off the beam: there is no aim assist.
 func _fire(ship: Dictionary, side: String) -> void:
 	var weapon: Dictionary = ship["weapons"][side]
 	var loads: Array = weapon["loads"]
 	if not loads.any(func(load): return load == 1.0):
 		events.append({"type": "fire_rejected", "ship_id": ship["id"], "side": side, "reason": "no_loaded_guns"})
 		return
-	var direction: Vector2 = aim_for(ship["id"], side)["direction"]
+	var direction := Vector2.from_angle(ship["heading"] + (-PI / 2.0 if side == "port" else PI / 2.0))
+	var keel := Vector2.from_angle(ship["heading"])
 	for i in loads.size():
 		if loads[i] != 1.0:
 			continue
 		loads[i] = 0.0
+		var muzzle: Vector2 = ship["position"] + keel * gun_offset(i, loads.size(), _radius(ship))
 		projectiles.append({
 			"id": next_projectile_id, "owner_id": ship["id"], "ammo": weapon["ammo"],
-			"position": ship["position"], "direction": direction,
+			"position": muzzle, "direction": direction,
 			"remaining_range": Definitions.AMMO[weapon["ammo"]]["range"], "owner_cleared": false,
 		})
 		events.append({"type": "shot", "ship_id": ship["id"], "side": side, "gun_index": i,
 			"projectile_id": next_projectile_id, "ammo": weapon["ammo"],
-			"position": ship["position"], "direction": direction})
+			"position": muzzle, "direction": direction})
 		next_projectile_id += 1
 
 

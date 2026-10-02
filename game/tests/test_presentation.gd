@@ -31,9 +31,6 @@ func run(t) -> bool:
 	var normalized: Array = p.normalize_events([{"type": "hit", "projectile_id": 7, "victim_id": 3, "position": Vector2.ONE, "track": "crew", "damage": 5, "ammo": "grape"}, {"type": "splash", "projectile_id": 8, "position": Vector2.ZERO}, {"type": "fire_rejected", "ship_id": 1, "side": "port", "reason": "no_loaded_guns"}, {"type": "ship_defeated", "ship_id": 2, "position": Vector2.ZERO, "reasons": ["sails", "crew"]}])
 	t.check(normalized.map(func(e): return e["type"]) == ["hit", "splash", "empty", "defeated"] and normalized[0]["target_id"] == 3 and normalized[3]["reasons"] == ["sails", "crew"], "event fields translated at adapter")
 	t.check(normalized[0]["projectile_id"] == 7 and normalized[0]["track"] == "crew" and normalized[0]["damage"] == 5 and normalized[0]["ammo"] == "grape" and normalized[1]["projectile_id"] == 8 and normalized[2]["ship_id"] == 1, "hit, splash and empty retain authoritative fields")
-	t.check(p.aim_label(0, "assisted", "Sloop B").begins_with("NO LOADED") and p.aim_label(2, "assisted", "Sloop B") == "ASSIST → Sloop B", "empty overrides authoritative assist text")
-	for reason in ["outside_arc", "out_of_range", "no_active_enemy"]:
-		t.check(p.aim_label(2, reason, "").to_lower().contains("fires straight"), "authoritative aim reason %s" % reason)
 	var sim = Sim.new()
 	sim.reset("two_sloops", "sloop")
 	var before := {"ships": sim.ships.duplicate(true), "projectiles": sim.projectiles.duplicate(true), "result": sim.result.duplicate(true)}
@@ -48,13 +45,7 @@ func run(t) -> bool:
 	duel.reset("practice", "sloop")
 	t.check(p.ship_label(duel, 2) == "Target" and p.has_method("marker_badge")
 		and p.call("marker_badge", duel, 2) == "TARGET",
-		"practice identity shared by HUD, assist and marker")
-	sim.ships[3]["position"] = sim.ships[1]["position"] + Vector2(0, 300)
-	sim.ships[2]["active"] = false
-	var aim: Dictionary = sim.aim_for(1, "starboard")
-	sim.ships[1]["weapons"]["starboard"]["loads"].fill(0.0)
-	var unloaded: Dictionary = sim.aim_for(1, "starboard")
-	t.check(aim["target_id"] == 3 and unloaded["target_id"] == 3 and p.aim_label(0, unloaded["reason"], p.ship_label(sim, unloaded["target_id"])).begins_with("NO LOADED") and p.ship_label(sim, 3) == "Sloop B", "empty guns retain B bracket identity")
+		"practice identity shared by HUD and marker")
 	var main = load("res://main.tscn").instantiate()
 	t.root.add_child(main)
 	main.set_physics_process(false)
@@ -99,9 +90,8 @@ func run(t) -> bool:
 	hud.refresh(main.sim)
 	t.check("LOAD RESET" in hud.ammo_labels["port"].text and "LOAD RESET" not in hud.ammo_labels["starboard"].text,
 		"ammo change announces only that side's reload reset")
-	t.check(hud.get("aim_icons") is Dictionary and hud.get("aim_icons").has("port")
-		and hud.get("aim_icons")["port"].draw.get_connections().size() > 0,
-		"noncolor aim symbol is drawn beside status")
+	t.check(hud.get("aim_icons") == null and hud.get("aim_labels") == null
+		and not p.has_method("aim_label"), "no aim-assist status or symbol remains in the HUD")
 	main.start_encounter("two_sloops", "sloop")
 	main.sim.ships[2]["active"] = false
 	main.sim.ships[2]["defeat_reasons"] = ["sails", "crew"]

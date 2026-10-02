@@ -373,7 +373,7 @@ func _test_weapon_hud(t) -> void:
 		and panel_of.call(hud.side_labels["starboard"]) != hud.target_label.get_parent().get_parent()
 		and panel_of.call(hud.side_labels["port"]) != panel_of.call(hud.side_labels["starboard"]),
 		"each broadside occupies its own panel apart from ship conditions")
-	t.check("OUTSIDE ARC" in text and "900" in text, "initial target is outside arc; range still shown")
+	t.check("OUTSIDE ARC" not in text and "ASSIST" not in text, "no aim-assist status in the HUD")
 	var visible_bars := func(side: String) -> Array:
 		return hud.gun_bars[side].filter(func(bar): return bar.visible).map(func(bar): return bar.value)
 	t.check(visible_bars.call("port") == [100.0, 100.0, 100.0, 100.0], "sloop shows four loaded port gun bars")
@@ -385,8 +385,8 @@ func _test_weapon_hud(t) -> void:
 	main.sim.ships[1]["weapons"]["port"]["loads"] = [1.0, 0.5, 0.0, 0.25]
 	hud.refresh(main.sim)
 	t.check("Port · Grape · 1/4 ready" in _all_text(hud) and visible_bars.call("port")[1] == 50.0
-		and "Starboard · Round · 4/4 ready" in _all_text(hud) and "Range 300" in _all_text(hud),
-		"one side changes ammo/range/progress without affecting opposite broadside")
+		and "Starboard · Round · 4/4 ready" in _all_text(hud),
+		"one side changes ammo/progress without affecting opposite broadside")
 	main.sim.ships[1]["weapons"]["port"]["loads"] = [0.999, 0.0, 0.0, 0.0]
 	hud.refresh(main.sim)
 	t.check("Port · Grape · 0/4 ready" in hud.side_labels["port"].text
@@ -413,8 +413,8 @@ func _test_weapon_hud(t) -> void:
 	main.sim.ships[2]["active"] = false
 	main.sim.ships[2]["defeat_reasons"] = ["sails", "crew"]
 	hud.refresh(main.sim)
-	t.check("SAILS · CREW" in _all_text(hud) and "NO ACTIVE TARGET" in _all_text(hud),
-		"defeated target reasons and inactive aim are visible")
+	t.check("SAILS · CREW" in _all_text(hud) and "ASSIST" not in _all_text(hud),
+		"defeated target reasons are visible; no aim status is shown")
 	main.start_practice("sloop")
 
 
@@ -430,8 +430,8 @@ func _test_event_handoff(t) -> void:
 	_tap(KEY_Q)
 	main.advance_tick()
 	t.check("no loaded guns" in main.hud.feedback_labels["port"].text
-		and "NO LOADED GUNS" in main.hud.aim_labels["port"].text,
-		"rejected fire feedback and overriding status occupy separate labels")
+		and "0/4 ready" in main.hud.side_labels["port"].text,
+		"rejected fire feedback and the empty ready count occupy separate labels")
 	main.set_paused(true)
 	var remaining: int = main.hud._feedback["port"]
 	for i in 10:

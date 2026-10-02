@@ -67,18 +67,6 @@ static func normalize_events(events: Array) -> Array:
 	return output
 
 
-static func aim_label(loaded: int, reason: String, target_label: String) -> String:
-	if loaded == 0:
-		return "NO LOADED GUNS — reloading"
-	match reason:
-		"assisted": return "ASSIST → " + target_label
-		"no_active_enemy": return "NO ACTIVE TARGET — fires straight"
-		"out_of_range": return "OUT OF RANGE — close distance; fires straight"
-		"outside_arc": return "OUTSIDE ARC — turn broadside; fires straight"
-	push_error("Unexpected aim_for reason: " + reason)
-	return "AIM STATUS UNAVAILABLE"
-
-
 static func ship_label(sim, id: int) -> String:
 	if sim.preset_id == "practice":
 		return "Target"

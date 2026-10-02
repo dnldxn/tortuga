@@ -89,20 +89,20 @@ func _test_segment_geometry(t) -> void:
 
 
 func _test_nearest_contact_and_ties(t) -> void:
-	# Brig (r28) nearer along the path than a frigate inserted first; coincident sloops tie by ID.
+	# Brig (r35) nearer along the path than a frigate inserted first; coincident sloops tie by ID.
 	for reverse in [false, true]:
 		var sim = _sim_with([_ship(5, 1, "frigate", Vector2(1100, 1000)), _ship(2, 1, "brig", Vector2(1050, 1000))], reverse)
 		_shot(sim, 9, "round", Vector2(1000, 1000), Vector2.RIGHT)
 		sim._apply_damage(sim._advance_projectiles(DT * 20.0, [2, 5]))  # 200-unit segment reaches both
 		t.check(sim.ships[2]["hull"] == 152.0 and sim.ships[5]["hull"] == 240.0, "nearest contact wins regardless of insertion (reverse=%s)" % reverse)
-		var tie = _sim_with([_ship(4, 1, "sloop", Vector2(1025, 1000)), _ship(3, 1, "sloop", Vector2(1025, 1000))], reverse)
+		var tie = _sim_with([_ship(4, 1, "sloop", Vector2(1030, 1000)), _ship(3, 1, "sloop", Vector2(1030, 1000))], reverse)
 		_shot(tie, 9, "round", Vector2(1000, 1000), Vector2.RIGHT)
 		tie._advance_projectiles(DT, [3, 4])
 		t.check(_of_type(tie, "hit").size() == 1 and _of_type(tie, "hit")[0]["victim_id"] == 3, "coincident colliders tie to lower ID (reverse=%s)" % reverse)
 
 
 func _test_range_endpoint(t) -> void:
-	for c in [[Vector2(1027, 1000), true], [Vector2(1027.01, 1000), false]]:
+	for c in [[Vector2(1032.5, 1000), true], [Vector2(1032.51, 1000), false]]:
 		var sim = _sim_with([_ship(2, 1, "sloop", c[0])])
 		_shot(sim, 9, "round", Vector2(1000, 1000), Vector2.RIGHT, true, 5.0)
 		sim._advance_projectiles(DT, [2])
@@ -112,7 +112,7 @@ func _test_range_endpoint(t) -> void:
 
 
 func _test_travel(t) -> void:
-	for c in [["round", 900.0, 125], ["chain", 600.0, 100], ["grape", 300.0, 56]]:
+	for c in [["round", 900.0, 157], ["chain", 600.0, 125], ["grape", 300.0, 70]]:
 		var sim = _sim_with([_ship(1, 0, "sloop", Vector2(2500, 2100))])
 		sim.ships[1]["weapons"]["port"] = {"ammo": c[0], "loads": [1.0, 0.0, 0.0, 0.0]}
 		sim.step(DT, {1: {"fire_port": true}})
@@ -140,6 +140,8 @@ func _test_owner_clearance(t) -> void:
 	sim.step(DT, {})
 	t.check(not sim.projectiles[0]["owner_cleared"], "shot still inside owner circle (tick 3)")
 	sim.step(DT, {})
+	t.check(not sim.projectiles[0]["owner_cleared"], "shot still inside owner circle (tick 4)")
+	sim.step(DT, {})
 	t.check(sim.projectiles[0]["owner_cleared"], "shot cleared once endpoint leaves owner circle")
 	t.check(sim.ships[1]["hull"] == 100.0, "owner never hit while leaving")
 	var gone = _sim_with([_ship(1, 0, "sloop", Vector2(2500, 2100)), _ship(2, 1, "brig", Vector2(4000, 2100))])
@@ -155,7 +157,7 @@ func _test_muzzle_and_owner_hits(t) -> void:
 	sim._apply_damage(sim._advance_projectiles(DT, [1, 2]))
 	t.check(sim.ships[1]["hull"] == 100.0 and sim.ships[2]["hull"] == 92.0, "muzzle exception skips owner only; overlapping ally hit")
 	var own = _sim_with([_ship(1, 0, "sloop", Vector2(1000, 1000))])
-	_shot(own, 1, "round", Vector2(1000, 975), Vector2.DOWN, true)
+	_shot(own, 1, "round", Vector2(1000, 970), Vector2.DOWN, true)
 	own._apply_damage(own._advance_projectiles(DT, [1]))
 	t.check(own.ships[1]["hull"] == 92.0, "cleared shot can hit its owner")
 
@@ -192,13 +194,13 @@ func _test_friendly_fire(t) -> void:
 
 func _test_fixed_direction_and_miss(t) -> void:
 	var shooter := _ship(1, 0, "sloop", Vector2(2500, 2100))
-	shooter["weapons"]["port"]["loads"] = [1.0, 0.0, 0.0, 0.0]
+	shooter["weapons"]["port"]["loads"] = [0.0, 0.0, 0.0, 1.0]  # stern gun: the target sails east out of its lane
 	var sim = _sim_with([shooter, _ship(2, 1, "sloop", Vector2(2500, 1700))])
 	sim.step(DT, {1: {"fire_port": true}})
 	var dir: Vector2 = sim.projectiles[0]["direction"]
 	t.check(_of_type(sim, "shot")[0]["direction"] == dir, "shot event carries projectile direction")
 	var fixed := true
-	for i in 150:
+	for i in 160:  # round needs 157 ticks to splash at 345.6 units/s
 		sim.step(DT, {1: {"turn": 1.0}, 2: {"turn": -0.3}})
 		if not sim.projectiles.is_empty():
 			fixed = fixed and sim.projectiles[0]["direction"] == dir
@@ -303,7 +305,7 @@ func _test_damage_effects(t) -> void:
 	# Chain brings sails 56 -> 50 (half): next tick speed uses .3+.7*.5 = .65.
 	var sim = _hit_brig("chain", [160.0, 56.0, 90.0])
 	sim.step(DT, {})
-	t.near(sim.ships[2]["speed"], 104.4 * 0.8 * 0.65, 1e-4, "half sails after chain: .65 speed scale")
+	t.near(sim.ships[2]["speed"], 93.96 * 0.8 * 0.65, 1e-4, "half sails after chain: .65 speed scale")
 	# Grape brings crew 50 -> 45 (half): this tick reloads at pre-damage crew, next at .625.
 	var brig := _ship(2, 1, "brig", Vector2(3000, 2100))
 	brig["crew"] = 50.0
@@ -348,4 +350,5 @@ func _test_event_copies(t) -> void:
 	fire.step(DT, {1: {"fire_port": true}})
 	var shot: Dictionary = _of_type(fire, "shot")[0]
 	t.check(shot.keys() == ["type", "ship_id", "side", "gun_index", "projectile_id", "ammo", "position", "direction"], "shot event fields")
-	t.check(shot["position"] == fire.ships[1]["position"] and shot["ammo"] == "round", "shot from ship center")
+	t.check(shot["position"] == fire.ships[1]["position"] + Vector2(NavalSimulation.gun_offset(0, 4, 27.5), 0)
+		and shot["ammo"] == "round", "gun 0 fires from its bow-ward place on the keel")

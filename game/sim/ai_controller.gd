@@ -289,15 +289,13 @@ func _select_ammo(command: Dictionary, observation: Dictionary, ship: Dictionary
 			command["fire_" + side] = true
 
 
-## Aim and muzzle use the same current centers as NavalSimulation. Its pure swept-circle
-## query checks only the current lane; allies that move after launch still take hits.
+## Shots fly straight off the beam, so the lane is the broadside from the current center
+## (the gun spread stays inside the hull). Its pure swept-circle query checks only the
+## current lane; allies that move after launch still take hits.
 func _ally_blocks_fire(observation: Dictionary, ship: Dictionary, target: Dictionary, side: String, ammo_range: float) -> bool:
 	var start: Vector2 = ship["position"]
-	var direction: Vector2 = (target["position"] - start).normalized()
 	var broadside: float = ship["heading"] + (-PI / 2.0 if side == "port" else PI / 2.0)
-	if absf(Definitions.wrap_angle(direction.angle() - broadside)) > Definitions.ARC_HALF_ANGLE:
-		direction = Vector2.from_angle(broadside)
-	var end: Vector2 = start + direction * ammo_range
+	var end: Vector2 = start + Vector2.from_angle(broadside) * ammo_range
 	var target_radius: float = Definitions.VESSELS[target["vessel_id"]]["radius"]
 	var target_t := NavalSimulation.segment_circle(start, end, target["position"], target_radius)
 	if target_t < 0.0:

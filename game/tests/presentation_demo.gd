@@ -38,14 +38,6 @@ func _initialize() -> void:
 			{"label": "A + B adjacent corner · separate labels", "kind": "corner"},
 			{"label": "Sloop A defeated (sails + crew) · survivor is still Sloop B", "kind": "a_defeated"},
 		]
-		"aim-cues": snapshots = [
-			{"label": "Both sides assisted · A port / B starboard", "kind": "assisted"},
-			{"label": "Both sides empty · brackets still identify A / B", "kind": "empty"},
-			{"label": "Both sides outside arc · fires straight", "kind": "outside_arc"},
-			{"label": "Both sides out of range · fires straight", "kind": "out_of_range"},
-			{"label": "No active enemy · both sides fire straight", "kind": "no_active_enemy"},
-			{"label": "Practice Target · port assisted", "kind": "target"},
-		]
 		"conditions": snapshots = [
 			{"label": "Full tracks · intact sails / round volley", "kind": "full"},
 			{"label": "49% hull + sails · cracks and tears / chain hit", "kind": "half"},
@@ -57,7 +49,7 @@ func _initialize() -> void:
 			{"label": "Missed shot · splash (no impact)", "kind": "splash"},
 		]
 		_:
-			push_error("Unknown presentation demo case: " + selected + " (choose two-enemies, aim-cues, conditions)")
+			push_error("Unknown presentation demo case: " + selected + " (choose two-enemies, conditions)")
 			valid = false
 			quit(1)
 			return
@@ -109,7 +101,7 @@ func _process(_delta: float) -> bool:
 func show_snapshot(next: int) -> void:
 	index = next
 	var kind: String = snapshots[index]["kind"]
-	main.start_encounter("practice" if kind == "target" else "two_sloops", "frigate")
+	main.start_encounter("two_sloops", "frigate")
 	# Clone the reset state; fixture edits affect this snapshot only, never definitions or sim rules.
 	var sim = main.sim
 	sim.ships = sim.ships.duplicate(true)
@@ -144,23 +136,6 @@ func show_snapshot(next: int) -> void:
 					enemy[reason] = 0.0
 			raw_events.append({"type": "ship_defeated", "ship_id": 2,
 				"position": enemy["position"], "reasons": reasons.duplicate()})
-		"assisted", "empty", "outside_arc", "out_of_range", "no_active_enemy":
-			var offset := 250.0
-			if kind == "out_of_range":
-				offset = 1100.0
-			for id in [2, 3]:
-				sim.ships[id]["position"] = origin + Vector2(0, -offset if id == 2 else offset)
-				if kind == "outside_arc":
-					sim.ships[id]["position"] = origin + Vector2(-offset if id == 2 else offset, 0)
-				if kind == "no_active_enemy":
-					sim.ships[id]["active"] = false
-			if kind == "empty":
-				for side in Definitions.SIDES:
-					player["weapons"][side]["loads"].fill(0.0)
-					raw_events.append({"type": "fire_rejected", "ship_id": 1,
-						"side": side, "reason": "no_loaded_guns"})
-		"target":
-			player["heading"] = PI / 2.0  # port points east at the stationary Target.
 		"full", "half", "quarter", "splash":
 			for id in [2, 3]:
 				sim.ships[id]["position"] = origin + Vector2(0, -320 if id == 2 else 320)
@@ -207,18 +182,7 @@ func show_snapshot(next: int) -> void:
 func check_snapshot(kind: String, events: Array) -> void:
 	var sim = main.sim
 	var hud = main.hud
-	if kind == "target":
-		_check(sim.aim_for(1, "port")["reason"] == "assisted"
-			and hud.aim_labels["port"].text.contains("Target"), "practice Target assist")
-	else:
-		_check(hud.target_label.text.contains("Sloop A") and hud.second_target_label.text.contains("Sloop B"), "stable A/B rows")
-	if kind in ["assisted", "empty", "outside_arc", "out_of_range", "no_active_enemy"]:
-		var expected := "assisted" if kind == "empty" else kind
-		for side in Definitions.SIDES:
-			_check(sim.aim_for(1, side)["reason"] == expected, "%s %s aim reason" % [kind, side])
-			if kind == "empty":
-				_check(hud.aim_labels[side].text.contains("NO LOADED GUNS")
-					and sim.aim_for(1, side)["target_id"] != null, "%s empty overrides assist text only" % side)
+	_check(hud.target_label.text.contains("Sloop A") and hud.second_target_label.text.contains("Sloop B"), "stable A/B rows")
 	if kind in ["far", "same_edge", "corner"]:
 		var view = main.arena_view
 		var markers: Dictionary = view.enemy_markers(sim, sim.ships[1]["position"],

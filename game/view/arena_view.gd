@@ -283,33 +283,6 @@ func _draw_combat() -> void:
 		return
 	var sim = main.sim
 	var font := ThemeDB.fallback_font
-	var player: Dictionary = sim.ships.get(sim.PLAYER_ID, {})
-	if not player.is_empty() and player["active"]:
-		for side in Definitions.SIDES:
-			var aim: Dictionary = sim.aim_for(sim.PLAYER_ID, side)
-			var bearing: float = player["heading"] + (-PI / 2.0 if side == "port" else PI / 2.0)
-			var radius: float = aim["range"]
-			var ink := Color(1.0, 0.94, 0.67, 0.5) if aim["target_id"] != null else Color(1.0, 1.0, 1.0, 0.25)
-			var wedge := PackedVector2Array([player["position"]])
-			for i in 13:
-				wedge.append(player["position"] + Vector2.from_angle(bearing + lerpf(-Definitions.ARC_HALF_ANGLE, Definitions.ARC_HALF_ANGLE, i / 12.0)) * radius)
-			draw_colored_polygon(wedge, Color(ink.r, ink.g, ink.b, .07))
-			for edge in [-1.0, 1.0]:
-				draw_line(player["position"], player["position"] + Vector2.from_angle(bearing + edge * Definitions.ARC_HALF_ANGLE) * radius, ink, 2.0)
-			draw_arc(player["position"], radius, bearing - Definitions.ARC_HALF_ANGLE,
-				bearing + Definitions.ARC_HALF_ANGLE, 24, ink, 2.0)
-			_draw_text(font, player["position"] + Vector2.from_angle(bearing) * 85,
-				"%s · %d wu" % [side.to_upper(), roundi(radius)], Color.WHITE)
-			if aim["target_id"] != null and sim.ships.has(aim["target_id"]):
-				var target: Dictionary = sim.ships[aim["target_id"]]
-				var center: Vector2 = target["position"]
-				var r: float = Definitions.VESSELS[target["vessel_id"]]["radius"] + 12.0
-				for x in [-1.0, 1.0]:
-					for y in [-1.0, 1.0]:
-						var corner := center + Vector2(x, y) * r
-						draw_line(corner, corner - Vector2(x * 9, 0), TARGET_INK, 2)
-						draw_line(corner, corner - Vector2(0, y * 9), TARGET_INK, 2)
-				_draw_text(font, center + Vector2(-r, -r - 8), side[0].to_upper(), TARGET_INK)
 	for id in sim.ships:
 		var ship: Dictionary = sim.ships[id]
 		if ship["role"] != "practice_target":
@@ -326,10 +299,10 @@ func _draw_combat() -> void:
 				var p: Vector2 = enemy["position"]
 				var ink := ENEMY_INK
 				if id == 2:
-					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -43), p + Vector2(-7, -32), p + Vector2(7, -32)]), ink)
+					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -54), p + Vector2(-7, -40), p + Vector2(7, -40)]), ink)
 				else:
-					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -44), p + Vector2(-7, -37), p + Vector2(0, -30), p + Vector2(7, -37)]), ink)
-				_draw_text(font, p + Vector2(12, -30), Presentation.ship_label(sim, id), ink)
+					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -55), p + Vector2(-7, -46), p + Vector2(0, -38), p + Vector2(7, -46)]), ink)
+				_draw_text(font, p + Vector2(15, -38), Presentation.ship_label(sim, id), ink)
 	for shot in sim.projectiles:
 		var p: Vector2 = shot["position"]
 		draw_circle(p, 5, Color.BLACK)

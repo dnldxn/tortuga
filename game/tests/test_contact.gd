@@ -127,37 +127,37 @@ func _resolve(t, list: Array, label: String):
 
 func _test_projection(t) -> void:
 	var sim = _resolve(t, [_ship(1, "sloop", Vector2(-100, 5000)), _ship(2, "brig", Vector2(3000, 100))], "projection")
-	t.check(sim.ships[1]["position"] == Vector2(182, 4018), "sloop projected to SW safe corner")
-	t.check(sim.ships[2]["position"] == Vector2(3000, 188), "brig projected to north safe edge")
+	t.check(sim.ships[1]["position"] == Vector2(187.5, 4012.5), "sloop projected to SW safe corner")
+	t.check(sim.ships[2]["position"] == Vector2(3000, 195), "brig projected to north safe edge")
 
 
 func _test_unequal_radii(t) -> void:
 	var sim = _resolve(t, [_ship(1, "sloop", Vector2(3000, 2000)), _ship(2, "frigate", Vector2(3030, 2000))], "unequal pair")
-	t.near(sim.ships[1]["position"].x, 2987.0, 1e-3, "sloop takes half of 26 overlap")
-	t.near(sim.ships[2]["position"].x, 3043.0, 1e-3, "frigate takes half of 26 overlap")
+	t.near(sim.ships[1]["position"].x, 2980.0, 1e-3, "sloop takes half of 40 overlap")
+	t.near(sim.ships[2]["position"].x, 3050.0, 1e-3, "frigate takes half of 40 overlap")
 	_resolve(t, [_ship(1, "sloop", Vector2(3000, 2000)), _ship(2, "brig", Vector2(3020, 2010)), _ship(3, "frigate", Vector2(3035, 1995))], "unequal trio")
 
 
 func _test_equal_split(t) -> void:
 	var sim = _resolve(t, [_ship(1, "brig", Vector2(3000, 2000)), _ship(2, "brig", Vector2(3000, 2040))], "equal split")
-	t.check(sim.ships[1]["position"] == Vector2(3000, 1992) and sim.ships[2]["position"] == Vector2(3000, 2048), "equal ships split 16 overlap 8/8")
+	t.check(sim.ships[1]["position"] == Vector2(3000, 1985) and sim.ships[2]["position"] == Vector2(3000, 2055), "equal ships split 30 overlap 15/15")
 
 
 func _test_stationary_contact(t) -> void:
-	var sim = _resolve(t, [_ship(1, "sloop", Vector2(3000, 2000)), _ship(2, "sloop", Vector2(3044, 2000))], "touching pair")
-	t.check(sim.ships[1]["position"] == Vector2(3000, 2000) and sim.ships[2]["position"] == Vector2(3044, 2000), "exact touching contact does not move")
+	var sim = _resolve(t, [_ship(1, "sloop", Vector2(3000, 2000)), _ship(2, "sloop", Vector2(3055, 2000))], "touching pair")
+	t.check(sim.ships[1]["position"] == Vector2(3000, 2000) and sim.ships[2]["position"] == Vector2(3055, 2000), "exact touching contact does not move")
 	var wall := _edge("sloop", Vector2.LEFT)
-	sim = _resolve(t, [_ship(1, "sloop", wall), _ship(2, "sloop", wall + Vector2(44, 0))], "touching at wall")
-	t.check(sim.ships[1]["position"] == wall and sim.ships[2]["position"] == wall + Vector2(44, 0), "touching at wall does not move")
+	sim = _resolve(t, [_ship(1, "sloop", wall), _ship(2, "sloop", wall + Vector2(55, 0))], "touching at wall")
+	t.check(sim.ships[1]["position"] == wall and sim.ships[2]["position"] == wall + Vector2(55, 0), "touching at wall does not move")
 
 
 func _test_coincident(t) -> void:
 	var sim = _resolve(t, [_ship(1, "sloop", Vector2(3000, 2000)), _ship(2, "frigate", Vector2(3000, 2000))], "coincident unequal")
-	t.check(sim.ships[1]["position"] == Vector2(2972, 2000) and sim.ships[2]["position"] == Vector2(3028, 2000), "coincident: lower id -X, higher id +X")
+	t.check(sim.ships[1]["position"] == Vector2(2965, 2000) and sim.ships[2]["position"] == Vector2(3035, 2000), "coincident: lower id -X, higher id +X")
 	var east := _edge("sloop", Vector2.RIGHT)
 	sim = _resolve(t, [_ship(1, "sloop", east), _ship(2, "sloop", east)], "coincident at east wall")
 	t.check(sim.ships[2]["position"] == east, "coincident at east wall: blocked higher id stays on bound")
-	t.near(sim.ships[1]["position"].x, east.x - 44.0, 1e-3, "coincident at east wall: free partner takes the whole correction inward")
+	t.near(sim.ships[1]["position"].x, east.x - 55.0, 1e-3, "coincident at east wall: free partner takes the whole correction inward")
 	_resolve(t, [_ship(4, "brig", Vector2(3000, 2000)), _ship(2, "brig", Vector2(3000, 2000)), _ship(9, "brig", Vector2(3000, 2000))], "coincident trio")
 	for d in WALLS + CORNERS:
 		var p := _edge("brig", d)
@@ -171,7 +171,7 @@ func _test_walls(t) -> void:
 		var along := Vector2(d.y, d.x)
 		var pair = _resolve(t, [_ship(1, "sloop", p), _ship(2, "sloop", p - d * 20.0)], "equal pair at wall %s" % d)
 		t.check(pair.ships[1]["position"] == p, "wall %s: blocked ship stays on bound" % d)
-		t.check((pair.ships[2]["position"] - (p - d * 44.0)).length() <= 1e-3, "wall %s: partner takes the blocked half (at %s)" % [d, pair.ships[2]["position"]])
+		t.check((pair.ships[2]["position"] - (p - d * 55.0)).length() <= 1e-3, "wall %s: partner takes the blocked half (at %s)" % [d, pair.ships[2]["position"]])
 		_resolve(t, [_ship(1, "sloop", p), _ship(2, "brig", p - d * 20.0)], "pair at wall %s" % d)
 		_resolve(t, [_ship(2, "sloop", p), _ship(1, "frigate", p - d * 20.0)], "pair at wall %s (ids swapped)" % d)
 		_resolve(t, [_ship(1, "sloop", p), _ship(2, "sloop", p - d * 15.0), _ship(3, "sloop", p - d * 30.0)], "chain at wall %s" % d)
@@ -204,8 +204,8 @@ func _test_through_step(t) -> void:
 		var sim = _sim_with([a, b, c], reverse)
 		sim.result = {}  # plan 03: a resolved result freezes stepping; test the live path
 		sim.step(DT, {})
-		t.near(sim.ships[1]["speed"], 103.68, 1e-4, "step: contact keeps requested downwind speed (reverse=%s)" % reverse)
-		t.near(sim.ships[2]["speed"], 15.552, 1e-4, "step: contact keeps requested upwind speed (reverse=%s)" % reverse)
+		t.near(sim.ships[1]["speed"], 93.312, 1e-4, "step: contact keeps requested downwind speed (reverse=%s)" % reverse)
+		t.near(sim.ships[2]["speed"], 13.9968, 1e-4, "step: contact keeps requested upwind speed (reverse=%s)" % reverse)
 		t.check(sim.ships[1]["heading"] == 0.0 and absf(sim.ships[2]["heading"]) == PI, "step: contact keeps headings (reverse=%s)" % reverse)
 		t.check(_worst_penetration(_active(sim)) <= TOL, "step: resolved contact (reverse=%s)" % reverse)
 		t.check(sim.ships[3] == c, "step: inactive ships untouched (reverse=%s)" % reverse)
@@ -213,7 +213,7 @@ func _test_through_step(t) -> void:
 	out.result = {}  # plan 03: a resolved result freezes stepping; test the live path
 	out.step(DT, {})
 	t.check(out.ships[1]["position"] == _edge("sloop", Vector2.RIGHT), "step: ship sailing into wall stays on safe bound")
-	t.near(out.ships[1]["speed"], 103.68, 1e-4, "step: wall-blocked ship keeps requested speed")
+	t.near(out.ships[1]["speed"], 93.312, 1e-4, "step: wall-blocked ship keeps requested speed")
 
 
 ## Ship at the west bound facing out (west): turn inward 180 ticks, neutral 420 ticks.

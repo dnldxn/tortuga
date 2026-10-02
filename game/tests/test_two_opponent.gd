@@ -15,7 +15,6 @@ func run(t) -> bool:
 	_test_traffic_runs(t)
 	_test_traffic_deadlines(t)
 	_test_fire_lanes(t)
-	_test_assisted_targets(t)
 	_test_friendly_hits(t)
 	_test_swept_collisions(t)
 	_test_outcomes(t)
@@ -65,10 +64,10 @@ func _test_reset(t) -> void:
 
 func _test_sloop_fairness(t) -> void:
 	var vessel: Dictionary = Definitions.VESSELS["sloop"]
-	t.check(vessel["full_speed"] == 129.6 and vessel["turn_rate"] == 1.2
+	t.check(vessel["full_speed"] == 116.64 and vessel["turn_rate"] == 1.2
 		and [vessel["hull"], vessel["sails"], vessel["crew"]] == [100.0, 70.0, 60.0]
-		and [vessel["guns_per_side"], vessel["base_reload"], vessel["radius"]] == [4, 7.0, 22.0],
-		"sloops share existing 129.6 speed, turns, tracks, guns, reload and radius")
+		and [vessel["guns_per_side"], vessel["base_reload"], vessel["radius"]] == [4, 7.0, 27.5],
+		"sloops share existing 116.64 speed, turns, tracks, guns, reload and radius")
 	var sim = NavalSimulation.new()
 	sim.reset("two_sloops", "sloop")
 	# Translated, identical orientations and tracks yield identical speed/turn/reload.
@@ -328,49 +327,21 @@ func _test_fire_lanes(t) -> void:
 		obs["ships"][3]["position"] = Vector2(3200, 2100)
 		t.check(ai.commands_for_tick(obs, DT)[2]["fire_" + side], "%s fire lane reevaluated next tick" % side)
 		var sign := -1.0 if side == "port" else 1.0
-		for offset in [21.5, 22.5]:
-			# The 22-unit sloop circle grazes the shot at x=3021.5; x=3022.5 misses.
+		for offset in [27.0, 28.0]:
+			# The 27.5-unit sloop circle grazes the shot at x=3027; x=3028 misses.
 			var graze := _fire_observation(side, Vector2(3000 + offset, 2100 + sign * 200.0))
 			var grazed: Dictionary = AIController.new().commands_for_tick(graze, DT)[2]
-			t.check(grazed["fire_" + side] == (offset > 22.0),
-				"%s lane %s sloop circle" % [side, "misses" if offset > 22.0 else "grazes"])
+			t.check(grazed["fire_" + side] == (offset > 27.5),
+				"%s lane %s sloop circle" % [side, "misses" if offset > 27.5 else "grazes"])
 		var beyond: Dictionary = AIController.new().commands_for_tick(
 			_fire_observation(side, Vector2(3000, 2100 + sign * 600.0)), DT)[2]
 		t.check(beyond["fire_" + side], "%s ally behind target leaves shot available" % side)
-		for bearing in [9.9, 10.1]:
+		for bearing in [3.9, 4.1]:
 			var edge := _fire_observation(side, Vector2(3200, 2100))
 			edge["ships"][1]["position"] = Vector2(3000 + 400.0 * tan(deg_to_rad(bearing)), 2100 + sign * 400.0)
 			var command: Dictionary = AIController.new().commands_for_tick(edge, DT)[2]
-			t.check(command["fire_" + side] == (bearing < 10.0),
-				"%s %s-degree target obeys 10-degree fire cone" % [side, bearing])
-
-
-func _test_assisted_targets(t) -> void:
-	for reverse in [false, true]:
-		var sim = NavalSimulation.new()
-		sim.reset("two_sloops", "sloop")
-		sim.ships[1]["position"] = Vector2(3000, 2100)
-		sim.ships[1]["heading"] = 0.0
-		sim.ships[2]["position"] = Vector2(3000, 2400)
-		sim.ships[3]["position"] = Vector2(3000, 2600)
-		if reverse:
-			sim.ships = {3: sim.ships[3], 2: sim.ships[2], 1: sim.ships[1]}
-		t.check(sim.aim_for(1, "starboard")["target_id"] == 2, "nearest assisted enemy is 2 (reverse=%s)" % reverse)
-		sim.ships[2]["active"] = false
-		t.check(sim.aim_for(1, "starboard")["target_id"] == 3, "aim switches to 3 after 2 inactive (reverse=%s)" % reverse)
-		sim.ships[2]["active"] = true
-		sim.ships[2]["position"] = Vector2(2990, 2400)
-		sim.ships[3]["position"] = Vector2(3010, 2400)
-		t.check(sim.aim_for(1, "starboard")["target_id"] == 2, "equal distance picks lower ID (reverse=%s)" % reverse)
-		for id in [2, 3]:
-			sim.ships[id]["position"].y = 1800
-		t.check(sim.aim_for(1, "port")["target_id"] == 2, "port mirror tie picks lower ID (reverse=%s)" % reverse)
-		sim.ships[2]["position"] = Vector2(5000, 1800)
-		t.check(sim.aim_for(1, "port")["target_id"] == 3, "port switches after 2 outside arc/range")
-		sim.ships[3]["active"] = false
-		t.check(sim.aim_for(1, "port")["target_id"] == null
-			and sim.aim_for(1, "port")["direction"].distance_to(Vector2.UP) < 0.00001,
-			"no eligible target leaves port fire perpendicular")
+			t.check(command["fire_" + side] == (bearing < 4.0),
+				"%s %s-degree target obeys 4-degree fire cone" % [side, bearing])
 
 
 func _shot(sim, owner: int, ammo: String, at: Vector2, remaining := -1.0) -> void:
@@ -578,9 +549,8 @@ func _test_simultaneous_fire(t) -> void:
 		"both enemies active at step start fire before one is defeated")
 	var obs := sim.ai_observation()
 	t.check(not obs["ships"][2]["active"] and not obs["ships"][2].has("sides")
-		and obs["ships"][2]["id"] == 2 and obs["ships"][2]["hull"] == 0.0
-		and sim.aim_for(1, "port")["target_id"] == null,
-		"defeated ship keeps identity but has no active weapons or aim eligibility")
+		and obs["ships"][2]["id"] == 2 and obs["ships"][2]["hull"] == 0.0,
+		"defeated ship keeps identity but has no active weapons")
 
 
 func _test_defeated_exclusion(t) -> void:
@@ -612,7 +582,8 @@ func _test_defeated_exclusion(t) -> void:
 	sim.ships[2]["position"] = Vector2(3000, 1950)
 	sim.ships[3]["position"] = Vector2(3000, 1800)
 	sim.ships[3]["sails"] = 0.0  # keep centers aligned while the shot travels
-	sim.ships[3]["weapons"]["starboard"]["loads"] = [1.0, 0.0, 0.0, 0.0]
+	# Stern gun (19.25 west of center): the AI's tick-0 turn swings its lane east, onto the player.
+	sim.ships[3]["weapons"]["starboard"]["loads"] = [0.0, 0.0, 0.0, 1.0]
 	var command: Dictionary = AIController.new().commands_for_tick(sim.ai_observation(), DT)
 	t.check(command.keys() == [3] and command[3]["fire_starboard"],
 		"survivor may fire through defeated ally using ordinary AI commands")

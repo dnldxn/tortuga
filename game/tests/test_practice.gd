@@ -94,7 +94,6 @@ func _test_target_preset(t) -> void:
 		for side in ["port", "starboard"]:
 			var weapon: Dictionary = target.get("weapons", {}).get(side, {})
 			t.check(weapon.get("ammo") == "round" and weapon.get("loads") == [1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "%s target %s loaded round" % [vessel_id, side])
-			t.check(sim.aim_for(1, side)["reason"] == "outside_arc", "%s initial target due east is outside the %s arc" % [vessel_id, side])
 		t.check(sim.ships[1]["position"] == Vector2(2500, 2100) and sim.ships[1]["heading"] == 0.0 and sim.ships[1]["role"] == "ship",
 			"%s player unchanged at (2500,2100) heading 0" % vessel_id)
 

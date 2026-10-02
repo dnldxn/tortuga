@@ -34,13 +34,10 @@ var defeated_notice: Label
 var side_labels := {}  # side -> header Label
 var ammo_labels := {}
 var gun_bars := {}  # side -> Array[ProgressBar], prebuilt for the largest vessel
-var aim_labels := {}
-var aim_icons := {}
 var feedback_labels := {}
 var _last_ammo := {}
 var _ammo_notice := {}  # side -> ticks remaining after a real ammo change
 var crew_notice: Label
-var practice_notice: Label
 var _feedback := {}  # side -> remaining physics ticks
 var escape_panel: PanelContainer
 var escape_rule_label: Label
@@ -68,7 +65,6 @@ func _ready() -> void:
 	wind_arrow.draw.connect(_draw_wind_arrow)
 	motion.add_child(wind_arrow)
 	wind_label = _label(motion)
-	practice_notice = _label(status)
 	var target := _corner(PRESET_TOP_RIGHT)
 	target_label = _label(target)
 	var first_stats := _row(target)
@@ -137,15 +133,6 @@ func _make_side(parent: Node, side: String, max_guns: int) -> void:
 		pip.mouse_filter = MOUSE_FILTER_IGNORE
 		bar.add_child(pip)
 		gun_bars[side].append(bar)
-	var aim_row := _row(parent)
-	aim_labels[side] = _label(aim_row)
-	aim_labels[side].add_theme_font_size_override("font_size", 16)
-	var icon := Control.new()
-	icon.custom_minimum_size = Vector2(24, 24)
-	icon.mouse_filter = MOUSE_FILTER_IGNORE
-	icon.draw.connect(_draw_aim_icon.bind(side))
-	aim_row.add_child(icon)
-	aim_icons[side] = icon
 	feedback_labels[side] = _label(parent)
 	feedback_labels[side].add_theme_color_override("font_color", Color(1.0, 0.55, 0.45))
 	feedback_labels[side].visible = false
@@ -194,7 +181,6 @@ func refresh(sim) -> void:
 	wind_label.text = "Wind %s →" % COMPASS[sector]
 	wind_heading = sim.wind_heading
 	wind_arrow.queue_redraw()
-	practice_notice.text = "Aim assist — shots can miss" if sim.preset_id == "practice" else ""
 	var target: Dictionary = sim.ships.get(2, {})
 	panels[1].visible = not target.is_empty()
 	second_target_block.visible = sim.ships.has(3)
@@ -243,11 +229,6 @@ func refresh(sim) -> void:
 			glyph, ammo["display_name"], ammo["track"].capitalize()]
 		if _ammo_notice.has(side):
 			ammo_labels[side].text += " · LOAD RESET"
-		var aim: Dictionary = sim.aim_for(sim.PLAYER_ID, side)
-		var target_name: String = Presentation.ship_label(sim, aim["target_id"]) if aim["target_id"] != null else ""
-		aim_labels[side].text = "Range %d · %s" % [roundi(aim["range"]), Presentation.aim_label(ready, aim["reason"], target_name)]
-		aim_icons[side].set_meta("status", "empty" if ready == 0 else aim["reason"])
-		aim_icons[side].queue_redraw()
 		feedback_labels[side].text = "no loaded guns" if _feedback.has(side) else ""
 		feedback_labels[side].visible = _feedback.has(side)
 	_refresh_escape(sim, ship)
@@ -309,24 +290,6 @@ func _draw_wind_arrow() -> void:
 	wind_arrow.draw_circle(c, 15, Color(0, 0, 0, 0.45))
 	wind_arrow.draw_line(c - dir * 11, c + dir * 4, Color.WHITE, 3.0)
 	wind_arrow.draw_colored_polygon(PackedVector2Array([c + dir * 13, c + dir * 3 + side * 6, c + dir * 3 - side * 6]), Color.WHITE)
-
-
-func _draw_aim_icon(side: String) -> void:
-	var icon: Control = aim_icons[side]
-	match icon.get_meta("status", "assisted"):
-		"empty", "no_active_enemy":
-			icon.draw_arc(Vector2(12, 12), 8, 0, TAU, 24, Color.WHITE, 2)
-		"out_of_range":
-			for x in [3.0, 21.0]:
-				icon.draw_line(Vector2(x, 4), Vector2(x, 20), Color.WHITE, 2)
-			icon.draw_line(Vector2(5, 12), Vector2(19, 12), Color.WHITE, 2)
-		"outside_arc":
-			icon.draw_arc(Vector2(12, 12), 8, -PI * .85, PI * .55, 20, Color.WHITE, 2)
-			icon.draw_colored_polygon(PackedVector2Array([Vector2(17, 5), Vector2(23, 7), Vector2(18, 12)]), Color.WHITE)
-		"assisted":
-			icon.draw_line(Vector2(3, 12), Vector2(21, 12), Color.WHITE, 2)
-			icon.draw_line(Vector2(15, 6), Vector2(21, 12), Color.WHITE, 2)
-			icon.draw_line(Vector2(15, 18), Vector2(21, 12), Color.WHITE, 2)
 
 
 ## A panel pinned to one screen corner, growing inward as its content grows.
