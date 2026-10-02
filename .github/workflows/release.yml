@@ -1,0 +1,58 @@
+name: release
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**.md']
+  workflow_dispatch:
+concurrency:
+  group: release
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        id: godot
+        with:
+          path: ~/godot
+          key: godot-4.7.2-stable-v1
+      - name: Download Godot (cache miss)
+        if: steps.godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          B=https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable
+          curl -fsSLO "$B/Godot_v4.7.2-stable_linux.x86_64.zip"
+          curl -fsSLO "$B/Godot_v4.7.2-stable_export_templates.tpz"
+          sha512sum -c - <<'EOF'
+          9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65  Godot_v4.7.2-stable_linux.x86_64.zip
+          ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079  Godot_v4.7.2-stable_export_templates.tpz
+          EOF
+          unzip -q Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q Godot_v4.7.2-stable_export_templates.tpz templates/version.txt \
+            templates/linux_release.x86_64 templates/windows_release_x86_64.exe templates/macos.zip
+          rm Godot_v4.7.2-stable_linux.x86_64.zip Godot_v4.7.2-stable_export_templates.tpz
+          chmod +x Godot_v4.7.2-stable_linux.x86_64
+      - name: Set up Godot
+        run: |
+          echo "GODOT=$HOME/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+          T="${XDG_DATA_HOME:-$HOME/.local/share}/godot/export_templates/4.7.2.stable"
+          mkdir -p "$T" /tmp/opencode
+          cp ~/godot/templates/* "$T/"
+      - name: Test
+        run: bash game/tests/run_settings_checks.sh
+      - name: Pick version
+        run: |
+          N=$(gh release list --limit 1000 --json tagName \
+            --jq '[.[].tagName | select(test("^v0\\.[0-9]+$")) | ltrimstr("v0.") | tonumber] | max // 0')
+          echo "VERSION=0.$((N + 1))" >> "$GITHUB_ENV"
+      - name: Build
+        run: bash tools/build_release.sh "$VERSION" "$RUNNER_TEMP/release"
+      - name: Publish
+        run: |
+          gh release create "v$VERSION" "$RUNNER_TEMP"/release/* --target "$GITHUB_SHA" --latest \
+            --title "Tortuga $VERSION — Test build" --notes "Commit $GITHUB_SHA"
