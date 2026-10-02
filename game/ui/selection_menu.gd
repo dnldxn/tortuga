@@ -19,7 +19,7 @@ const MODES := [
 	["duel_frigate", "Frigate duel"],
 	["two_sloops", "Two-ship encounter — two sloops"],
 ]
-const GUIDANCE := "Sink the enemy, or exhaust its sails or crew. Turn a broadside toward it to fire."
+const GUIDANCE := "Sink the enemy, or exhaust its sails or crew. Turn a broadside toward it to fire. Good hunting!"
 
 var sailing_button: Button
 var duel_buttons := {}  # preset id -> Button
