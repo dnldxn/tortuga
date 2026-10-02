@@ -20,6 +20,7 @@ const Settings := preload("res://settings.gd")
 const SettingsMenu := preload("res://ui/settings_menu.gd")
 const Presentation := preload("res://view/combat_presentation.gd")
 const CombatAudio := preload("res://audio/combat_audio.gd")
+const UpdateService := preload("res://update/update_service.gd")
 
 const DT := 1.0 / 60.0
 const PRESET := "practice"
@@ -39,6 +40,7 @@ var pause_menu: Control
 var result_menu: Control
 var settings_menu: Control
 var combat_audio: Node
+var update_service: Node
 
 var _held := {}  # turn actions freshly pressed while sailing and not yet released
 var _toggle_queued := false  # parity of non-echo toggle presses since the last tick
@@ -74,6 +76,16 @@ func _ready() -> void:
 	settings_menu.closed.connect(close_settings)
 	settings.changed.connect(_on_settings_changed)
 	selection.show_notice(settings.notice)
+	update_service = UpdateService.new()
+	update_service.name = "UpdateService"
+	add_child(update_service)
+	update_service.state_changed.connect(selection.show_update_state)
+	selection.check_updates_requested.connect(update_service.check)
+	selection.update_requested.connect(update_service.update_and_restart)
+	selection.full_download_requested.connect(func() -> void: OS.shell_open(UpdateService.RELEASES_URL))
+	# The service picked its first state (disabled in dev builds) before the menu listened.
+	selection.show_version(update_service.version)
+	selection.show_update_state(update_service.state, update_service.detail)
 	_enter_mode("selection")
 
 

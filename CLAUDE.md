@@ -39,14 +39,18 @@ bash tools/build_release.sh 0.N build/phase-2/release   # local build of all rel
 
 Strict sim / controller / presentation split:
 
+- **`boot.gd` / `boot.tscn`** — main scene; overlays the installed update pack from `user://updates/`, then loads `res://main.tscn`. Preloads nothing from the game.
 - **`sim/naval_simulation.gd`** — pure `RefCounted` state: no SceneTree, nodes, physics, input, drawing or audio. `reset(preset_id, vessel_id)` and `step(dt, commands)` where `commands` is keyed by ship ID (`turn`, `toggle_sails`, `fire_port/starboard`, `cycle_port/starboard`). State: `ships` (int id → Dictionary; player is id 1, opposition ≥ 2), `projectiles`, `events` (current step only), `elapsed`, `result`, `wind_heading`. Step order: toggle → turn → speed → move → `resolve_contacts()` → elapsed. A non-empty `result` freezes `step()`. Deterministic: identical command tapes must produce identical checkpoints (tests assert this).
 - **`sim/definitions.gd`** — all tuning data: `VESSELS` (sloop/brig/frigate), `PRESETS`, arena, wind, `AMMO`, and `AI` tuning. Put new tuning constants here, not inline.
 - **`sim/ai_controller.gd`** — deterministic opposition AI. Takes a copied `sim.ai_observation()` and returns ordinary commands (same shape a player issues); never touches the sim, nodes or input. Its own sim-time clock is the only time source.
 - **`main.gd`** — mode controller (`selection` / `sailing` / `paused` / `result`). Owns `sim` and `ai`, collects input into per-tick commands (edge-triggered actions queue once per tick; held keys never repeat), and runs exactly one fixed 1/60 s step per `advance_tick()` with no accumulator/catch-up. The SceneTree is never paused (menus keep running); pausing just gates ticks. Signals `practice_started` (after reset — views resync) and `mode_changed`. `return_to_selection()` replaces `sim`, so views must read `main.sim` fresh each time.
+- **`update/update_service.gd`** — owned by main (child "UpdateService"). Network only on click (Check / Update and Restart), never at startup; `disabled` for `dev` builds. Reads version/base from `res://version.cfg`, downloads pack to `user://updates/<file>.part`, verifies SHA-256, renames, writes `installed.cfg`, then restarts. Signals `state_changed(state, detail)`, which main forwards to the selection menu.
 - **`view/arena_view.gd`, `ui/*.gd`** — presentation built in code (menus, HUD, theme are created in `main._ready`, not in `.tscn`). They read `main.sim` and must never mutate it; events are deep-copied before use.
 - **`input_bindings.gd`** — default action map installed at startup (A/D steer, W sails, Esc pause, plus fire/cycle/reset actions) and remapping of the 8 gameplay actions (logical keycodes; Escape and `ui_*` reserved).
 - **`settings.gd`** — `RefCounted` settings model owned by main: load → apply at startup. ConfigFile `user://settings.cfg` holds only version, the 8 keys, 3 bus gains and window mode; an invalid file means all defaults + a notice and is never rewritten. Buses come from `default_bus_layout.tres` (Master/Effects/Ambient).
 - **`ui/settings_menu.gd`** — draft-edit overlay opened from selection/pause; while open, main routes all input to it first. Apply = save, then apply.
+
+Changing a base-ID file (`project.godot`, `export_presets.cfg`, `default_bus_layout.tres`, `boot.*`, `class_name` lines) or the engine forces players to do a full download. Use `res://` paths, not `uid://`, in load/preload.
 
 Ship art is SVG in `game/assets/ships/` (see `ATTRIBUTION.md`); `game/.godot/` and `build/phase-2/` are gitignored.
 

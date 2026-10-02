@@ -23,6 +23,7 @@ const SUITES: Array[String] = [
 	"res://tests/test_settings.gd",
 	"res://tests/test_settings_ui.gd",
 	"res://tests/test_presentation.gd",
+	"res://tests/test_updater.gd",  # keep last: loaded packs persist and switch res:// to pack DirAccess
 ]
 
 const ISOLATION_MESSAGE := "Settings tests require isolated user data. Run: bash game/tests/run_settings_checks.sh"
@@ -62,7 +63,12 @@ func _process(_delta: float) -> bool:
 		_run_suite(path)
 	if "--self-test-failure" in OS.get_cmdline_user_args():
 		check(false, "deliberate self-test failure (--self-test-failure)")
+	# A stray update_and_restart would quit(0) at once and relaunch Godot; fail and cancel the restart.
+	check(not OS.is_restart_on_exit_set(), "no suite scheduled a restart")
+	OS.set_restart_on_exit(false)
 	print("Tests: %d checks, %d failures" % [checks, failures])
+	if failures > 0:
+		quit(1)  # immediately: a quit(0) already requested this frame is overridden
 	# Let stopped WAV playbacks drain before the headless audio server shuts down.
 	return false
 
