@@ -26,7 +26,7 @@ bash game/tests/run_settings_checks.sh                                    # full
 bash game/tests/run_settings_checks.sh --self-test-failure                # must exit 1 (runner sanity)
 "$GODOT" --headless --path game --quit-after 30                           # smoke-run the real main scene (reads user://settings.cfg; the toolchain $P/xdg exports keep it off the real profile)
 "$GODOT" --path game --resolution 1280x720                                # play (needs a display)
-"$GODOT" --headless --path game --export-release macos ../build/phase-2/macos/Tortuga-v0.1-macos.zip
+bash tools/build_release.sh 0.N build/phase-2/release   # local build of all release assets
 ```
 
 `GODOT` must be an absolute path for the wrapper. There is no per-test filter: to run one suite, temporarily trim `SUITES` in `game/tests/run_tests.gd` and still run it through the wrapper (raw `run_tests.gd` refuses to run without the wrapper's isolated user data, `TORTUGA_TEST_ROOT`). Expected invalid-ID `ERROR` lines in test output are deliberate.
@@ -54,4 +54,4 @@ Ship art is SVG in `game/assets/ships/` (see `ATTRIBUTION.md`); `game/.godot/` a
 
 - Each plan ends with a verification record in `docs/phase-2/` (commands run, check counts, what was and wasn't verified). Keep headless/automated evidence distinct from native/real-display evidence; a Linux export is not proof it runs on macOS.
 - No network imports in `game/`.
-- Releasing a macOS test build reuses the rolling `v0.1` GitHub prerelease — follow `.agents/skills/claptrap/ct-tortuga-replace-test-release/SKILL.md` (build and verify before deleting the old release; pass the full commit SHA to `gh release create`). Only do this when the owner asks.
+- Every push to main publishes v0.N via .github/workflows/release.yml; local build: tools/build_release.sh.
