@@ -1,0 +1,13 @@
+; Tortuga updater bridge (native/updater). Inert in the source tree: the sibling
+; .gdignore keeps Godot from scanning this directory, so dev/editor/test runs never
+; try to load the (absent, untracked) library. Package staging (Plan 02) and the
+; external probe work on a disposable staging copy of game/: they place the built
+; library at the path below and delete .gdignore in that copy. Only linux.x86_64
+; is built and proved; macOS/Windows entries are added when those builds exist
+; (docs/phase-2/01-native-updater-feasibility.md).
+[configuration]
+entry_symbol = "tortuga_updater_init"
+compatibility_minimum = "4.7"
+
+[libraries]
+linux.x86_64 = "res://native/bin/libtortuga_updater.linux.template_release.x86_64.so"

@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "pins": {
+    "engine": "4.7.2.stable",
+    "velopack": "1.2.161"
+  },
+  "artifacts": {
+    "godot_editor_linux": {
+      "url": "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip",
+      "file": "Godot_v4.7.2-stable_linux.x86_64.zip",
+      "format": "zip",
+      "algorithm": "sha512",
+      "digest": "9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65",
+      "size": 77860424,
+      "version": "4.7.2.stable",
+      "pin": "engine",
+      "license": "MIT",
+      "provenance": "godotengine/godot-builds release 4.7.2-stable SHA512-SUMS.txt; downloaded bytes re-hashed 2026-10-01"
+    },
+    "godot_editor_macos": {
+      "url": "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_macos.universal.zip",
+      "file": "Godot_v4.7.2-stable_macos.universal.zip",
+      "format": "zip",
+      "algorithm": "sha512",
+      "digest": "38aa16e5bba2083941fc5b3e54be0089bd4cc35e32415f5b9fd9a8a6a7b9818255d44532ea8ef94b5aef56c4b407c2d634fa4f657e4ebe681ebbf59b7bac69ca",
+      "size": 170622178,
+      "version": "4.7.2.stable",
+      "pin": "engine",
+      "license": "MIT",
+      "provenance": "godotengine/godot-builds release 4.7.2-stable SHA512-SUMS.txt; downloaded bytes re-hashed 2026-10-01 (not executed: no macOS host)"
+    },
+    "godot_editor_windows": {
+      "url": "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip",
+      "file": "Godot_v4.7.2-stable_win64.exe.zip",
+      "format": "zip",
+      "algorithm": "sha512",
+      "digest": "83decd58fdf67b9d657958a1ae6bf1929c20785315a81effe245874cdc57acb709bf868e00778a96984338c1b29dafdb453c6847747694621c6ecf5da2259993",
+      "size": 86013866,
+      "version": "4.7.2.stable",
+      "pin": "engine",
+      "license": "MIT",
+      "provenance": "godotengine/godot-builds release 4.7.2-stable SHA512-SUMS.txt; downloaded bytes re-hashed 2026-10-01 (not executed: no Windows host)"
+    },
+    "godot_templates": {
+      "url": "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz",
+      "file": "Godot_v4.7.2-stable_export_templates.tpz",
+      "format": "zip",
+      "algorithm": "sha512",
+      "digest": "ca4d71c4d7b81dfc15d1a98baa07534aa95b03fdda78a0075b06672e1648d2e5f40980c9adc28d23e1b92e732ee7bf3461997aa804af74ec2fcd7a93ccb84079",
+      "size": 1281349702,
+      "version": "4.7.2.stable",
+      "pin": "engine",
+      "license": "MIT",
+      "provenance": "godotengine/godot-builds release 4.7.2-stable SHA512-SUMS.txt; downloaded bytes re-hashed 2026-10-01"
+    },
+    "vpk": {
+      "url": "https://github.com/velopack/velopack/releases/download/1.2.161/vpk.1.2.161.nupkg",
+      "file": "velopack-1.2.161/vpk.1.2.161.nupkg",
+      "format": "zip",
+      "algorithm": "sha256",
+      "digest": "2b56ce117f803fc70c103cb423bd040e395e40370f6ff6e10818e9ff9c26a323",
+      "size": 146884263,
+      "version": "1.2.161",
+      "pin": "velopack",
+      "commit": "92d6a1c91716729d449034df5c50307dcce39493",
+      "license": "MIT",
+      "provenance": "velopack/velopack release 1.2.161 asset digest (GitHub API); vpk.nuspec repository commit equals pin; downloaded bytes re-hashed 2026-10-01"
+    },
+    "velopack_libc": {
+      "url": "https://github.com/velopack/velopack/releases/download/1.2.161/velopack_libc_1.2.161.zip",
+      "file": "velopack-1.2.161/velopack_libc_1.2.161.zip",
+      "format": "zip",
+      "algorithm": "sha256",
+      "digest": "31de8f2cf05a47bd5328a9f98b0c41aec1582156f6075f1058b26941f7f17c20",
+      "size": 30774789,
+      "version": "1.2.161",
+      "pin": "velopack",
+      "commit": "92d6a1c91716729d449034df5c50307dcce39493",
+      "license": "MIT",
+      "provenance": "velopack/velopack release 1.2.161 asset digest (GitHub API); downloaded bytes re-hashed 2026-10-01"
+    },
+    "godot_cpp": {
+      "url": "https://github.com/godotengine/godot-cpp/archive/507ed9d840c01a3c5b2a39af8bb4000bfac30bf5.tar.gz",
+      "file": "godot-cpp/godot-cpp-507ed9d840c01a3c5b2a39af8bb4000bfac30bf5.tar.gz",
+      "format": "tar",
+      "algorithm": "sha256",
+      "digest": "30da4ac295997061a6af81ae531510efd4e6a86e506eb4466edc0898ef3fe048",
+      "size": 2551856,
+      "version": "10.0.0-stable",
+      "commit": "507ed9d840c01a3c5b2a39af8bb4000bfac30bf5",
+      "license": "MIT",
+      "provenance": "tag 10.0.0-stable -> commit 507ed9d8 (gh api git/ref, 2026-10-01); digest computed locally from GitHub's generated archive, whose bytes GitHub does not guarantee stable; compile proof against the dumped 4.7.2 API pending Task 3"
+    },
+    "dotnet_runtime_linux_x64": {
+      "url": "https://builds.dotnet.microsoft.com/dotnet/Runtime/10.0.12/dotnet-runtime-10.0.12-linux-x64.tar.gz",
+      "file": "dotnet-10.0.12/dotnet-runtime-10.0.12-linux-x64.tar.gz",
+      "format": "tar",
+      "algorithm": "sha512",
+      "digest": "58388fdde4f13bd703c7a6f7defb3300b17e42ba5fe8bca50066f80f64ac7406620dcdfb4acc1eff7992750c8cc5cff8369dd12d09730c8a9e8760d6032f7f6e",
+      "size": 36638192,
+      "version": "10.0.12",
+      "license": "MIT",
+      "provenance": "builds.dotnet.microsoft.com release-metadata/10.0/releases.json runtime 10.0.12 hash; downloaded bytes re-hashed 2026-10-01. Build-host tooling only (runs vpk), never shipped"
+    },
+    "dotnet_runtime_osx_arm64": {
+      "url": "https://builds.dotnet.microsoft.com/dotnet/Runtime/10.0.12/dotnet-runtime-10.0.12-osx-arm64.tar.gz",
+      "file": "dotnet-10.0.12/dotnet-runtime-10.0.12-osx-arm64.tar.gz",
+      "format": "tar",
+      "algorithm": "sha512",
+      "digest": "d1b422c2afecb5e741430584c3e1887d5e0f2df321a80d492fdd13d8c7f99579f0dbbf34e348bc512cb276f0f86b4645423a032ded52808b74ab8eb0d7bf2a6d",
+      "size": 33249724,
+      "version": "10.0.12",
+      "license": "MIT",
+      "provenance": "builds.dotnet.microsoft.com release-metadata/10.0/releases.json runtime 10.0.12 hash; downloaded bytes re-hashed 2026-10-01 (not executed: no macOS host)"
+    },
+    "dotnet_runtime_win_x64": {
+      "url": "https://builds.dotnet.microsoft.com/dotnet/Runtime/10.0.12/dotnet-runtime-10.0.12-win-x64.zip",
+      "file": "dotnet-10.0.12/dotnet-runtime-10.0.12-win-x64.zip",
+      "format": "zip",
+      "algorithm": "sha512",
+      "digest": "844fa99e16fd6f44e0a7c29def7a82d7846902334d6a955248a9519a4dddb3f5acceb9c9223bef69f8c83b8ae2417537e5b76dddf79fb7117dc85b5039bc1297",
+      "size": 36960258,
+      "version": "10.0.12",
+      "license": "MIT",
+      "provenance": "builds.dotnet.microsoft.com release-metadata/10.0/releases.json runtime 10.0.12 hash; downloaded bytes re-hashed 2026-10-01 (not executed: no Windows host)"
+    },
+    "squashfs_tools": {
+      "url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/os/Packages/s/squashfs-tools-4.6.1-8.fc44.x86_64.rpm",
+      "file": "squashfs-tools/squashfs-tools-4.6.1-8.fc44.x86_64.rpm",
+      "format": "rpm",
+      "algorithm": "sha256",
+      "digest": "0142193ea347a086008bed0c1f5f693dfdadf8305f72b075ff2afd7be0da6f4c",
+      "size": 253574,
+      "version": "4.6.1-8.fc44",
+      "license": "GPL-2.0-or-later",
+      "provenance": "Fedora 44 release repo (dnf repoquery); `rpm -K` digests/signatures OK; sha256 computed locally 2026-10-01. Build-host tool for vpk AppImage packing, never shipped; links host liblzo2/liblz4/libzstd/liblzma/libz"
+    }
+  },
+  "platforms": {
+    "linux-x86_64": {
+      "host": {"system": "Linux", "machine": ["x86_64"]},
+      "tools": {
+        "engine": ["godot_editor_linux", "Godot_v4.7.2-stable_linux.x86_64"],
+        "templates": ["godot_templates", "templates"],
+        "vpk": ["vpk", "tools/net10.0/any/vpk.dll"],
+        "velopack_sdk": ["velopack_libc", "."],
+        "godot_cpp": ["godot_cpp", "godot-cpp-507ed9d840c01a3c5b2a39af8bb4000bfac30bf5"],
+        "dotnet": ["dotnet_runtime_linux_x64", "dotnet"],
+        "mksquashfs": ["squashfs_tools", "usr/bin/mksquashfs"]
+      },
+      "dump_extension_api": true,
+      "cmake": {
+        "TORTUGA_VELOPACK_ROOT": "velopack_sdk",
+        "TORTUGA_GODOT_CPP_ROOT": "godot_cpp",
+        "TORTUGA_GODOT_EXTENSION_API": "extension_api",
+        "TORTUGA_GODOT_EXTENSION_INTERFACE": "gdextension_interface",
+        "TORTUGA_GODOT_EXTENSION_INTERFACE_JSON": "gdextension_interface_json"
+      },
+      "probes": {
+        "vpk": {"argv": ["$dotnet", "$vpk", "--help"], "expect": "Velopack CLI 1.2.161"},
+        "mksquashfs": {"argv": ["$mksquashfs", "-version"], "expect": "mksquashfs version 4.6.1"},
+        "cxx": {"argv": ["c++", "--version"]},
+        "cc": {"argv": ["cc", "--version"]},
+        "cmake": {"argv": ["cmake", "--version"]},
+        "ninja": {"argv": ["ninja", "--version"]}
+      },
+      "compiler_probes": ["cxx", "cc", "cmake", "ninja"],
+      "compiler": {"requirement": null, "status": "host-provided; family/minimum version unproved until the Task 2/3 native build passes"}
+    },
+    "macos-universal": {
+      "host": {"system": "Darwin", "machine": ["arm64"]},
+      "tools": {
+        "engine": ["godot_editor_macos", "Godot.app/Contents/MacOS/Godot"],
+        "templates": ["godot_templates", "templates"],
+        "vpk": ["vpk", "tools/net10.0/any/vpk.dll"],
+        "velopack_sdk": ["velopack_libc", "."],
+        "godot_cpp": ["godot_cpp", "godot-cpp-507ed9d840c01a3c5b2a39af8bb4000bfac30bf5"],
+        "dotnet": ["dotnet_runtime_osx_arm64", "dotnet"]
+      },
+      "dump_extension_api": true,
+      "cmake": {
+        "TORTUGA_VELOPACK_ROOT": "velopack_sdk",
+        "TORTUGA_GODOT_CPP_ROOT": "godot_cpp",
+        "TORTUGA_GODOT_EXTENSION_API": "extension_api",
+        "TORTUGA_GODOT_EXTENSION_INTERFACE": "gdextension_interface",
+        "TORTUGA_GODOT_EXTENSION_INTERFACE_JSON": "gdextension_interface_json"
+      },
+      "probes": {
+        "vpk": {"argv": ["$dotnet", "$vpk", "--help"], "expect": "Velopack CLI 1.2.161"},
+        "cxx": {"argv": ["c++", "--version"]},
+        "cmake": {"argv": ["cmake", "--version"]},
+        "xcode": {"argv": ["xcodebuild", "-version"]},
+        "lipo": {"argv": ["lipo", "-info", "/usr/bin/true"]}
+      },
+      "compiler_probes": ["cxx", "cmake", "xcode"],
+      "compiler": {"requirement": null, "status": "host-provided Xcode/Apple clang; unproved (no macOS host fetch yet). Apple Silicon build host only; Intel build host has no locked .NET runtime"}
+    },
+    "windows-x86_64": {
+      "host": {"system": "Windows", "machine": ["amd64"]},
+      "tools": {
+        "engine": ["godot_editor_windows", "Godot_v4.7.2-stable_win64_console.exe"],
+        "templates": ["godot_templates", "templates"],
+        "vpk": ["vpk", "tools/net10.0/any/vpk.dll"],
+        "velopack_sdk": ["velopack_libc", "."],
+        "godot_cpp": ["godot_cpp", "godot-cpp-507ed9d840c01a3c5b2a39af8bb4000bfac30bf5"],
+        "dotnet": ["dotnet_runtime_win_x64", "dotnet.exe"]
+      },
+      "dump_extension_api": true,
+      "cmake": {
+        "TORTUGA_VELOPACK_ROOT": "velopack_sdk",
+        "TORTUGA_GODOT_CPP_ROOT": "godot_cpp",
+        "TORTUGA_GODOT_EXTENSION_API": "extension_api",
+        "TORTUGA_GODOT_EXTENSION_INTERFACE": "gdextension_interface",
+        "TORTUGA_GODOT_EXTENSION_INTERFACE_JSON": "gdextension_interface_json"
+      },
+      "probes": {
+        "vpk": {"argv": ["$dotnet", "$vpk", "--help"], "expect": "Velopack CLI 1.2.161"},
+        "cmake": {"argv": ["cmake", "--version"]},
+        "msvc": {"argv": ["cl"]}
+      },
+      "compiler_probes": ["cmake", "msvc"],
+      "compiler": {"requirement": null, "status": "host-provided MSVC x64; unproved (no Windows host fetch yet)"}
+    }
+  }
+}

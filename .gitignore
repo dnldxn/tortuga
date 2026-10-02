@@ -1,6 +1,12 @@
 status.md
 .agents/
 .superpowers/
+config.json
 
 /game/.godot/
 /build/phase-2/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
