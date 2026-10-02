@@ -71,7 +71,8 @@ PY
 ```
 
 Stop on download, checksum, template-layout or binary-launch failure. Template presence is
-not export or native verification; no export presets exist yet (plan 08).
+not export or native verification. Export presets (macos, windows, linux) are in
+`game/export_presets.cfg` (plan 08.02).
 
 ### Restore in each new terminal
 
@@ -102,30 +103,25 @@ export GODOT="$P/bin/Godot_v4.7.2-stable_linux.x86_64"
 "$GODOT" --path game --resolution 1280x720   # real display
 ```
 
-## macOS test build (v0.1)
+## Release builds
 
-`game/export_presets.cfg` has a single `macos` preset (universal x86_64+arm64, ad-hoc signed,
-**not notarized**, tests excluded); plan 08 owns the full preset set. Build on Linux:
-
-```bash
-"$GODOT" --headless --path game --export-release macos ../build/phase-2/macos/Tortuga-v0.1-macos.zip
-```
-
-Originally published as GitHub release `v0.1` (private repo). On the Mac:
+Every push to `main` publishes a numbered release `v0.N` (marked latest) via
+`.github/workflows/release.yml`, with 7 assets (macOS, Windows and Linux archives, three
+`.pck` packs, `update.json`). Local build of all assets, from the repo root (needs an absolute
+`$GODOT` and the 4.7.2 export templates, see Toolchain above):
 
 ```bash
-gh release download v0.1 --repo dnldxn/tortuga --pattern 'Tortuga-v0.1-macos.zip'
-unzip Tortuga-v0.1-macos.zip
-xattr -dr com.apple.quarantine Tortuga.app   # un-notarized: otherwise Gatekeeper blocks it
-open Tortuga.app      # or: ./Tortuga.app/Contents/MacOS/Tortuga --resolution 1280x720
+bash tools/build_release.sh 0.N build/phase-2/release
 ```
 
-Export verified on Linux (bundle layout, universal Mach-O, pack runs headless). Native Mac
-launch and manual play of the **original plan-01 archive**: **passed**, owner-reported
-2026-09-30 (see verification record). The owner subsequently requested that release `v0.1`
-be replaced with the plan-02 target-practice build; the original archive and tag no longer
-represent the current download. See `02-broadside-practice.md` for the replacement's checksum
-and pending real-display checks.
+macOS: download `Tortuga-0.N-macos.zip` from the latest release, unzip, then:
+
+```bash
+xattr -dr com.apple.quarantine Tortuga.app   # ad-hoc signed, not notarized: otherwise Gatekeeper blocks it
+open Tortuga.app
+```
+
+Details and verification: `docs/phase-2/08-releases.md`.
 
 Suites are registered explicitly in `game/tests/run_tests.gd` (`SUITES`). Each suite exposes
 `func run(t) -> bool` and must `return true`; a suite aborted by a script error counts as a
