@@ -1,0 +1,22 @@
+# Tortuga dedicated server (linux-arm64). Install and operate: docs/phase-3/server-ops.md
+[Unit]
+Description=Tortuga dedicated server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=tortuga
+Group=tortuga
+EnvironmentFile=/etc/tortuga/server.env
+# /run/tortuga-server: created per start, owned by User/Group, removed after stop.
+RuntimeDirectory=tortuga-server
+ExecStart=/opt/tortuga/server/tortuga-server --headless -- --server --stop-file /run/tortuga-server/stop
+# Graceful stop ("Server stopped"): headless Godot ignores SIGINT and dies at once on SIGTERM, so
+# touch the stop file the server polls and wait (~1.5 s). SIGTERM after TimeoutStopSec is abrupt.
+ExecStop=/bin/sh -c 'touch /run/tortuga-server/stop; while kill -0 $MAINPID 2>/dev/null; do sleep 0.2; done'
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
