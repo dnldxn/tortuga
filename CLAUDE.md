@@ -93,7 +93,7 @@ Strict sim / controller / presentation split:
 
 Changing a base-ID file (`project.godot`, `export_presets.cfg`, `default_bus_layout.tres`, `boot.*`, `class_name` lines) or the engine forces players to do a full download. Use `res://` paths, not `uid://`, in load/preload.
 
-Ship art is SVG in `game/assets/ships/` (see `ATTRIBUTION.md`); `game/.godot/` and `build/phase-2/` are gitignored.
+Ship art is SVG in `game/assets/ships/` (see `ATTRIBUTION.md`); `game/.godot/`, `build/phase-2/` and `build/phase-3/` are gitignored.
 
 ## Conventions and process
 

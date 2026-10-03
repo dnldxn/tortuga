@@ -55,9 +55,9 @@ sudo journalctl -u tortuga-server -n 5          # banner, SRV listening port=246
 sudo /usr/local/sbin/tortuga-update-server        # latest release
 sudo /usr/local/sbin/tortuga-update-server 0.M    # a specific release (rollback)
 ```
-The restart is graceful. Players then click **Check for updates** so their version matches; after a
-rollback they need the 0.M download (the updater only moves forward). If `tools/update_server.sh`
-itself changed, `install` it again (§3).
+The stop is graceful; the script exits 1 if the new release isn't `active` (see §6). Players then
+click **Check for updates** so their version matches; after a rollback they need the 0.M download
+(the updater only moves forward). If `tools/update_server.sh` itself changed, `install` it again (§3).
 
 ## 5. Operate
 ```bash

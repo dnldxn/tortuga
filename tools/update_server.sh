@@ -21,9 +21,12 @@ tar --no-same-owner -xzf "$NAME"
 set -- tortuga-server-0.*/tortuga-server           # the archive's one top dir names the version
 test -x "$1" || { echo "unexpected archive layout: nothing installed" >&2; exit 1; }
 NEW="${1%/tortuga-server}"
-rm -rf /opt/tortuga/server                         # the running server keeps its open files
+systemctl stop tortuga-server                      # graceful: ExecStop touches the stop file
+rm -rf /opt/tortuga/server                         # swap only while stopped
 mv "$NEW" /opt/tortuga/server
 if command -v restorecon > /dev/null; then restorecon -R /opt/tortuga/server; fi
-systemctl restart tortuga-server                   # graceful: ExecStop touches the stop file
+systemctl start tortuga-server
 sleep 2
-echo "$NEW: $(systemctl is-active tortuga-server)"   # tortuga-server-0.N: active
+S="$(systemctl is-active tortuga-server)" || true
+echo "$NEW: $S"                                    # tortuga-server-0.N: active
+[ "$S" = active ]                                  # exit 1 if it did not start
