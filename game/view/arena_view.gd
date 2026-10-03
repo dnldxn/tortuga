@@ -107,7 +107,7 @@ func _ready() -> void:
 	water = ReefGlass.new()
 	water.name = "ReefGlass"
 	add_child(water)
-	camera.zoom = Vector2.ONE
+	camera.zoom = Vector2.ONE * Definitions.PRESENTATION.zoom_multiplier
 	camera.position_smoothing_enabled = false
 	camera.ignore_rotation = true
 	camera.limit_left = -int(Presentation.CAMERA_MARGIN)
@@ -217,6 +217,7 @@ func _active_bounds(sim) -> Rect2:
 ## Reconciles ship nodes with sim.ships by stable id and points the camera at the player.
 func sync(sim) -> void:
 	water.set_wind(sim.wind_heading)
+	var focus: Dictionary = sim.ships.get(main.focus_ship_id(), {})
 	for id in _ships.keys():
 		var ship: Dictionary = sim.ships.get(id, {})
 		if ship.is_empty() or ship["vessel_id"] != _ships[id].get_meta("vessel_id"):
@@ -233,6 +234,7 @@ func sync(sim) -> void:
 		node.set_ship_active(true)
 		node.modulate = Color(0.58, 0.64, 0.68, 0.7) if not ship["active"] else Color.WHITE
 		node.position = ship["position"]
+		node.set_view_distance(ship["position"].distance_to(focus["position"]) if not focus.is_empty() else 0.0)
 		var condition: Dictionary = Definitions.VESSELS[ship["vessel_id"]]
 		node.set_ship_state(ship["heading"], sim.wind_heading,
 			ship["speed"] / condition["full_speed"], ship["reefed"],

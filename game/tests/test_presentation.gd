@@ -9,8 +9,9 @@ func run(t) -> bool:
 	if script == null:
 		return true
 	var p = script.new()
-	t.check(is_equal_approx(p.zoom_for_extent(Vector2(2000, 900), Vector2(608, 200)), 0.75), "camera zoom floor")
-	t.check(is_equal_approx(p.zoom_for_extent(Vector2(10, 10), Vector2(608, 200)), 1.10), "camera zoom ceiling")
+	t.check(is_equal_approx(p.zoom_for_extent(Vector2(2000, 900), Vector2(608, 200)), 1.5), "camera zoom floor doubled")
+	t.check(is_equal_approx(p.zoom_for_extent(Vector2(10, 10), Vector2(608, 200)), 2.2), "camera zoom ceiling doubled")
+	t.near(p.zoom_for_extent(Vector2(608, 200), Vector2(608, 200)), 2.0, 0.0001, "auto-fit zoom is exactly twice the original fit")
 	var a := 1.1
 	var b := 1.1
 	for i in 60:
@@ -111,7 +112,7 @@ func run(t) -> bool:
 	main.sim.ships[2]["position"] = center + Vector2(3000, 0)
 	main.sim.ships[3]["position"] = center + Vector2(3100, 0)
 	t.check(view._desired_camera_center(main.sim).distance_to(center) <= 160.0 and view._nearby.is_empty(), "remote enemies cannot bias player follow")
-	t.check(p.zoom_for_extent(Vector2(3000, 3000), Vector2(608, 200)) == .75 and 44.0 * .75 == 33.0 and 22.0 * .75 == 16.5, "remote enemy cannot lower sloop footprint below floor")
+	t.check(p.zoom_for_extent(Vector2(3000, 3000), Vector2(608, 200)) == 1.5, "remote enemy cannot lower zoom below the doubled floor")
 	var roster: Dictionary = main.sim.ships
 	roster[2]["position"] = center + Vector2(2500, -100)
 	roster[3]["position"] = center + Vector2(2500, 100)
@@ -173,13 +174,14 @@ func run(t) -> bool:
 		var rotated_bounds: Rect2 = view._active_bounds(main.sim)
 		t.check(rotated_bounds.size.x >= diagonal.x * 2 and rotated_bounds.size.y >= diagonal.y * 2,
 			"camera bounds use rotated frigate footprint")
-	for zoom in [.75, 1.10]:
+	for zoom in [1.5, 2.2]:
 		for corner in [Vector2(182, 182), Vector2(5818, 182), Vector2(182, 4018), Vector2(5818, 4018)]:
 			var c: Vector2 = p.clamp_center(corner, corner, zoom, Vector2(1280, 720), Vector2(6000, 4200))
 			var half: Vector2 = Vector2(1280, 720) / (2.0 * zoom)
 			var visible := Rect2(c - half, half * 2)
 			var projected: Vector2 = Vector2(640, 360) + (corner - c) * zoom
-			t.check(limits.encloses(visible) and p.SAFE.has_point(projected), "boundary framing %s zoom %.2f" % [corner, zoom])
+			# Rect2 uses float32; clamping at the far arena edge may round by <0.001 wu.
+			t.check(limits.grow(.001).encloses(visible) and p.SAFE.has_point(projected), "boundary framing %s zoom %.2f" % [corner, zoom])
 	main.start_encounter("two_sloops", "sloop")
 	var pos: Vector2 = view.camera.position
 	var z: Vector2 = view.camera.zoom

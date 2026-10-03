@@ -38,7 +38,7 @@ func _battle_sim():
 	var sim = NavalSimulation.new()
 	sim.reset_battle("frigate_escort")
 	var ops := []
-	for c in [[FIRST, "sloop"], [FIRST + 1, "brig"], [FIRST + 2, "frigate"], [FIRST + 3, "sloop"]]:
+	for c in [[FIRST, "sloop"], [FIRST + 1, "brig"], [FIRST + 2, "frigate"], [FIRST + 3, "galleon"]]:
 		ops.append({"op": "add_captain", "ship_id": c[0], "vessel_id": c[1]})
 	sim.step(DT, {}, ops)
 	for i in 60:
@@ -198,6 +198,7 @@ func _test_bot_options(t) -> bool:
 		"preset": "duel_brig"})
 	t.check(o["host"] == "10.0.0.2" and o["port"] == 24690 and o["password"] == "pw" and o["captain_id"] == "c1"
 		and o["preset"] == "duel_brig" and o["error"] == "", "bot_options: host/port/password/captain-id/preset")
-	for bad in [{"preset": "practice"}, {"vessel": "galleon"}, {"seconds": "x"}, {"port": "0"}, {"port": "x"}]:
+	t.check(BotMain.bot_options({"vessel": "galleon"})["error"] == "", "bot_options: Galleon supported")
+	for bad in [{"preset": "practice"}, {"vessel": "unknown_ship"}, {"seconds": "x"}, {"port": "0"}, {"port": "x"}]:
 		t.check(BotMain.bot_options(bad)["error"] != "", "bot_options: error for %s" % [bad])
 	return true

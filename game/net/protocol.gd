@@ -30,7 +30,7 @@ const CAPTAIN_ID_MAX := 64
 const ACTION_QUEUE_MAX := 64
 const ACTIONS: Array[String] = ["fire_port", "fire_starboard", "cycle_port", "cycle_starboard", "toggle_sails"]
 const ROLES: Array[String] = ["ship", "practice_target"]
-const VESSEL_IDS: Array[String] = ["sloop", "brig", "frigate"]
+const VESSEL_IDS: Array[String] = ["sloop", "brig", "frigate", "galleon"]
 
 const FLAG_REEFED := 1
 const FLAG_ACTIVE := 2

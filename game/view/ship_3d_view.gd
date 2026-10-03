@@ -1,6 +1,6 @@
 class_name Ship3DView
 extends Node2D
-## A game-world Node2D backed by a transparent, fixed-camera 3D turntable.
+## A game-world Node2D backed by a transparent, distance-pitched 3D turntable.
 ## Navigation remains in the deterministic 2D simulation; only presentation lives here.
 
 const Definitions := preload("res://sim/definitions.gd")
@@ -8,21 +8,21 @@ const MODEL_SCENES := {
 	"sloop": preload("res://assets/ships/3d/sloop.glb"),
 	"brig": preload("res://assets/ships/3d/brig.glb"),
 	"frigate": preload("res://assets/ships/3d/frigate.glb"),
+	"galleon": preload("res://assets/ships/3d/galleon.glb"),
 }
-## Extra vertical framing prevents tall, wind-trimmed rigs from clipping during
-## end-on turns and maximum rocking. Vertical camera size and pixels grow by the
-## same 22/15 ratio; a little extra transparent width fits the sloop bowsprit.
-const FIT_HEIGHT := {"sloop": 10.56, "brig": 13.3466667, "frigate": 15.84}
-const CAMERA_TARGET_Y := {"sloop": 2.19, "brig": 2.84, "frigate": 3.18}
+## Double resolution for the 2x world zoom. Extra vertical padding fits end-on
+## hulls at 70 degrees; camera size and pixels grow together, preserving scale.
+const FIT_HEIGHT := {"sloop": 12.96, "brig": 16.38, "frigate": 19.44, "galleon": 25.2}
+const CAMERA_TARGET_Y := {"sloop": 2.19, "brig": 2.84, "frigate": 3.18, "galleon": 4.0}
 const TRIM_FACTORS := {
 	"sloop": [1.0],
 	"brig": [0.92, 1.0, 0.62],
 	"frigate": [0.92, 1.0, 1.0],
+	"galleon": [0.65, 1.0, 1.0],
 }
-const VIEWPORT_SIZE := Vector2i(208, 176)
-const DISPLAY_REFERENCE_WIDTH := 192.0  # Horizontal padding must not shrink the model in game pixels.
-const CAMERA_RISE := 8.1
-const CAMERA_DISTANCE := 14.0  # atan(8.1 / 14) = 30 degrees above horizontal.
+const VIEWPORT_SIZE := Vector2i(416, 432)
+const DISPLAY_REFERENCE_WIDTH := 384.0  # Padding/resolution must not change the world-space scale.
+const CAMERA_DISTANCE := 20.0
 const FULL_SAIL_SCALE := Vector3.ONE
 const REEFED_SAIL_SCALE := Vector3(0.72, 0.55, 0.72)
 const SAIL_FULL := Color(0.96, 0.93, 0.84)
@@ -42,8 +42,10 @@ var muzzle_markers := {"port": [], "starboard": []}
 var motion_phase := 0.0
 var sail_trim := 0.0
 var speed_ratio := 0.0
+var elevation_degrees: float = Definitions.PRESENTATION.ship_near_angle
 
 var _elapsed := 0.0
+var _heading := 0.0
 var _reefed := false
 var _sail_base_scales: Array[Vector3] = []
 var _sail_base_positions: Array[Vector3] = []
@@ -123,13 +125,12 @@ func _build_viewport() -> void:
 	ship_viewport.add_child(rim)
 
 	model_camera = Camera3D.new()
-	model_camera.name = "FixedCamera30Degrees"
+	model_camera.name = "DistanceCamera"
 	model_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	model_camera.size = FIT_HEIGHT[vessel_id]
 	model_camera.near = 0.1
 	model_camera.far = 60.0
-	var target := Vector3(0.0, CAMERA_TARGET_Y[vessel_id], 0.0)
-	model_camera.look_at_from_position(target + Vector3(0.0, CAMERA_RISE, CAMERA_DISTANCE), target, Vector3.UP)
+	_update_camera()
 	ship_viewport.add_child(model_camera)
 	model_camera.current = true
 
@@ -148,6 +149,14 @@ func _build_model() -> void:
 
 
 func _collect_rig_nodes(node: Node) -> void:
+	if node is MeshInstance3D:
+		# The pinned importer retains COLOR_0 but leaves its material flag disabled.
+		# Enable the procedural plank colors without altering the shared GLB resource.
+		for surface in node.mesh.get_surface_count():
+			if node.mesh.surface_get_format(surface) & Mesh.ARRAY_FORMAT_COLOR:
+				var material: StandardMaterial3D = node.get_active_material(surface).duplicate()
+				material.vertex_color_use_as_albedo = true
+				node.set_surface_override_material(surface, material)
 	if node is Node3D and node.name.begins_with("Muzzle_"):
 		var parts := String(node.name).split("_")
 		var markers: Array = muzzle_markers[parts[1]]
@@ -175,22 +184,51 @@ func _build_display(radius: float) -> void:
 	display_sprite.scale = Vector2.ONE * display_scale
 	# The camera frames the complete rig above the waterline. Offset the rendered
 	# rectangle so the hull origin, rather than the mast center, sits on sim.position.
-	var camera_up_y := CAMERA_DISTANCE / sqrt(CAMERA_DISTANCE * CAMERA_DISTANCE + CAMERA_RISE * CAMERA_RISE)
-	var origin_offset_pixels: float = CAMERA_TARGET_Y[vessel_id] * camera_up_y * float(VIEWPORT_SIZE.y) / FIT_HEIGHT[vessel_id]
-	display_sprite.position.y = -origin_offset_pixels * display_scale
+	_update_display_anchor()
 	add_child(display_sprite)
+
+
+## A smooth spatial blend keeps the focus ship overhead and distant hulls flatter.
+## Only the camera and compensated art yaw change; the simulation stays 2D.
+func set_view_distance(distance: float) -> void:
+	var tuning: Dictionary = Definitions.PRESENTATION
+	var blend := smoothstep(0.0, tuning.ship_angle_distance, maxf(distance, 0.0))
+	var angle := lerpf(tuning.ship_near_angle, tuning.ship_far_angle, blend)
+	if is_equal_approx(angle, elevation_degrees):
+		return
+	elevation_degrees = angle
+	_update_camera()
+	_update_display_anchor()
+	_update_rig_heading()
+
+
+func _update_camera() -> void:
+	var target := Vector3(0.0, CAMERA_TARGET_Y[vessel_id], 0.0)
+	var angle := deg_to_rad(elevation_degrees)
+	var offset := Vector3(0.0, sin(angle), cos(angle)) * CAMERA_DISTANCE
+	model_camera.look_at_from_position(target + offset, target, Vector3.UP)
+
+
+func _update_display_anchor() -> void:
+	var origin_offset_pixels: float = CAMERA_TARGET_Y[vessel_id] * cos(deg_to_rad(elevation_degrees)) * float(VIEWPORT_SIZE.y) / FIT_HEIGHT[vessel_id]
+	display_sprite.position.y = -origin_offset_pixels * display_sprite.scale.y
+
+
+func _update_rig_heading() -> void:
+	var model_heading := visual_yaw_for_heading(_heading)
+	heading_pivot.rotation.y = -model_heading
+	for index in sail_pivots.size():
+		var factor: float = TRIM_FACTORS[vessel_id][mini(index, TRIM_FACTORS[vessel_id].size() - 1)]
+		var sail_heading := visual_yaw_for_heading(_heading + sail_trim * factor)
+		sail_pivots[index].rotation.y = -Definitions.wrap_angle(sail_heading - model_heading)
 
 
 func set_ship_state(heading: float, wind_heading: float, normalized_speed: float,
 		is_reefed: bool, hull_fraction: float, sail_fraction: float) -> void:
-	var model_heading := visual_yaw_for_heading(heading)
-	heading_pivot.rotation.y = -model_heading
+	_heading = heading
 	speed_ratio = clampf(normalized_speed, 0.0, 1.0)
 	sail_trim = _sail_trim(Definitions.wrap_angle(wind_heading - heading))
-	for index in sail_pivots.size():
-		var factor: float = TRIM_FACTORS[vessel_id][mini(index, TRIM_FACTORS[vessel_id].size() - 1)]
-		var sail_heading := visual_yaw_for_heading(heading + sail_trim * factor)
-		sail_pivots[index].rotation.y = -Definitions.wrap_angle(sail_heading - model_heading)
+	_update_rig_heading()
 	if _reefed != is_reefed:
 		_reefed = is_reefed
 		for index in sail_surfaces.size():
@@ -238,10 +276,10 @@ func _sail_trim(relative_wind: float) -> float:
 	return sign_value * minf(deg_to_rad(68.0), folded * 0.68)
 
 
-## The oblique camera halves depth on screen. This inverse projection keeps the
-## rendered bow aligned with the 2D velocity vector at every compass heading.
+## Undo the current camera's depth foreshortening so the rendered bow remains
+## aligned with the 2D velocity at every heading and viewing distance.
 func visual_yaw_for_heading(heading: float) -> float:
-	var depth_projection := CAMERA_RISE / sqrt(CAMERA_DISTANCE * CAMERA_DISTANCE + CAMERA_RISE * CAMERA_RISE)
+	var depth_projection := sin(deg_to_rad(elevation_degrees))
 	return atan2(sin(heading) / depth_projection, cos(heading))
 
 

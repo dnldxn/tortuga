@@ -42,7 +42,8 @@ const outputDirectory = path.resolve(here, "../../game/assets/ships/3d");
 const representatives = {
   sloop: 0,   // Sunfish Runner
   brig: 0,    // Crown & Compass
-  frigate: 0  // Resolute
+  frigate: 0, // Resolute
+  galleon: 0 // Two gun decks, eight guns per deck per side
 };
 
 function isRenderable(object) {
@@ -141,17 +142,18 @@ for (const [vesselClass, variantIndex] of Object.entries(representatives)) {
     }
   });
   // Fail before exporting if a barrel tip lacks its stable gameplay mapping.
-  const expectedGuns = { sloop: 4, brig: 6, frigate: 8 }[vesselClass];
+  const expectedGuns = { sloop: 4, brig: 6, frigate: 8, galleon: 16 }[vesselClass];
   const barrels = [];
   model.object.traverse((child) => { if (child.name === "cannon barrel") barrels.push(child); });
   if (barrels.length !== expectedGuns * 2) throw new Error(`${vesselClass}: incorrect barrel count`);
   for (const side of ["port", "starboard"]) {
     let previousX = Infinity;
     for (let index = 0; index < expectedGuns; index += 1) {
+      if (vesselClass === "galleon" && index === 8) previousX = Infinity;
       const marker = model.object.getObjectByName(`Muzzle_${side}_${index}`);
       if (!marker || marker.position.x >= previousX) throw new Error(`${vesselClass}: missing or unordered muzzle`);
       const sign = side === "starboard" ? 1 : -1;
-      const barrel = barrels.find((item) => item.position.x === marker.position.x && Math.sign(item.position.z) === sign);
+      const barrel = model.cannons.find((cannon) => cannon.muzzle === marker).barrel;
       const tip = barrel.position.clone();
       tip.z += sign * barrel.geometry.parameters.height / 2;
       if (tip.distanceTo(marker.position) > 1e-6) throw new Error(`${vesselClass}: muzzle misses barrel tip`);

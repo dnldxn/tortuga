@@ -15,6 +15,7 @@ globalThis.FileReader ??= class {
 };
 
 const counts = { sloop: 8, brig: 12, frigate: 16, galleon: 32 };
+const originalTriangles = { sloop: 10006, brig: 13750, frigate: 16242, galleon: 20182 };
 const vector = () => new THREE.Vector3();
 const nearVector = (actual, expected, label) => assert.ok(actual.distanceTo(expected) < 1e-6, label);
 function inspectGeometry(object) {
@@ -80,7 +81,11 @@ for (const [type, total] of Object.entries(counts)) {
     const deckNormals = model.object.getObjectByName("cambered deck").geometry.attributes.normal;
     for (let index = 0; index < deckNormals.count; index += 1) assert.ok(deckNormals.getY(index) > 0, "deck normals face up");
     const stats = inspectGeometry(model.object);
-    assert.ok(stats.meshes > 100 && stats.triangles > 5000);
+    assert.ok(stats.triangles >= originalTriangles[type] * 2, "at least twice the original modeled detail");
+    assert.ok(stats.triangles < originalTriangles[type] * 3, "detail stays within the demo geometry budget");
+    const fittings = model.object.getObjectByName("joined ship craftsmanship");
+    assert.ok(fittings && fittings.children.length <= 8, "fixed fittings are batched by shared material");
+    assert.ok(fittings.children.every((part) => part.isMesh && part.geometry.index.count > 0));
     assert.equal(model.sailPivots.length, type === "sloop" ? 1 : 3);
     assert.ok(model.sailPivots.every((pivot) => pivot.parent === model.object && Number.isFinite(pivot.userData.trimFactor)));
     const pivotPoint = new THREE.Vector3(1, 1, 0.5);

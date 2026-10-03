@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "./vendor/three/BufferGeometryUtils.js";
 
 export const vesselCatalog = {
   sloop: {
@@ -340,7 +341,7 @@ function sideWidthAtDepth(station, depthFraction) {
 
 function addSurfaceDetails(ship, stations, dims, type, variant, materials) {
   const usableStations = stations.slice(0, -1);
-  const plankLevels = type === "sloop" ? [0.43, 0.64] : type === "brig" ? [0.36, 0.52, 0.69] : [0.31, 0.43, 0.56, 0.7];
+  const plankLevels = [0.12, 0.24, 0.36, 0.48, 0.6, 0.72, 0.84];
   [-1, 1].forEach((side) => {
     plankLevels.forEach((depthFraction, index) => {
       const points = usableStations.map((station) => {
@@ -357,25 +358,30 @@ function addSurfaceDetails(ship, stations, dims, type, variant, materials) {
     });
   });
 
-  const deckFractions = type === "sloop" ? [-0.58, -0.2, 0.2, 0.58] : [-0.7, -0.42, -0.14, 0.14, 0.42, 0.7];
+  const plankCount = type === "sloop" ? 12 : 16;
+  const deckFractions = Array.from({ length: plankCount - 1 }, (_, index) => (index + 1) / plankCount * 2 - 1);
   deckFractions.forEach((fraction) => {
     const points = usableStations.map((station) => new THREE.Vector3(
       station.x,
-      station.deckY + 0.102 + (1 - Math.abs(fraction)) * 0.025,
-      station.width * 0.82 * fraction
+      station.deckY + 0.096 - Math.abs(fraction) * 0.065,
+      station.width * 0.87 * fraction
     ));
     const seam = tubeAlong(points, 0.007, materials.plank);
     seam.name = "deck plank seam";
     ship.add(seam);
   });
 
-  const jointCount = type === "sloop" ? 7 : type === "brig" ? 9 : 11;
+  const jointCount = type === "sloop" ? 14 : type === "brig" ? 18 : 22;
   for (let index = 1; index < jointCount; index += 1) {
     const x = THREE.MathUtils.lerp(-dims.length * 0.4, dims.length * 0.4, index / jointCount);
-    const halfWidth = widthAt(stations, x) * 0.78;
-    const y = deckAt(stations, x) + 0.11;
-    const joint = cylinderBetween(new THREE.Vector3(x, y, -halfWidth), new THREE.Vector3(x, y, halfWidth), 0.006, materials.plank, 5);
-    joint.name = "deck plank butt line";
+    const fraction = ((index * 5) % plankCount) / plankCount * 2 - 1;
+    const width = widthAt(stations, x) * 0.87;
+    const z0 = width * fraction;
+    const z1 = width * (fraction + 2 / plankCount);
+    const y0 = deckAt(stations, x) + 0.096 - Math.abs(fraction) * 0.065;
+    const y1 = deckAt(stations, x) + 0.096 - Math.abs(fraction + 2 / plankCount) * 0.065;
+    const joint = cylinderBetween(new THREE.Vector3(x, y0, z0), new THREE.Vector3(x, y1, z1), 0.007, materials.plank, 5);
+    joint.name = "staggered deck plank butt";
     ship.add(joint);
   }
 
@@ -605,8 +611,8 @@ function addShrouds(ship, mastX, baseY, height, halfBeam, materials, scale = 1) 
     const right = new THREE.Vector3(mastX + 0.48 * scale, baseY + 0.08, side * halfBeam * 0.86);
     addLineSegments(ship, [[top, left], [top, center], [top, right]], materials.riggingBold, "standing shrouds");
     const rungs = [];
-    for (let rung = 1; rung <= 6; rung += 1) {
-      const t = 0.24 + rung * 0.09;
+    for (let rung = 1; rung <= 14; rung += 1) {
+      const t = 0.15 + rung * 0.055;
       rungs.push([
         top.clone().lerp(left, t),
         top.clone().lerp(right, t)
@@ -679,7 +685,7 @@ function addHullDetails(ship, stations, dims, type, variant, materials) {
     stripe.name = `${side > 0 ? "starboard" : "port"} color stripe`;
     ship.add(stripe);
 
-    const postCount = type === "sloop" ? 7 : type === "brig" ? 9 : 11;
+    const postCount = type === "sloop" ? 13 : type === "brig" ? 17 : 21;
     const railPoints = [];
     for (let index = 0; index < postCount; index += 1) {
       const x = THREE.MathUtils.lerp(-dims.length * 0.4, dims.length * 0.4, index / (postCount - 1));
@@ -874,7 +880,7 @@ function addCannons(ship, stations, dims, type, variant, materials, representati
           [new THREE.Vector3(x + halfFrame, y + halfFrame, frameZ), new THREE.Vector3(x - halfFrame, y + halfFrame, frameZ)],
           [new THREE.Vector3(x - halfFrame, y + halfFrame, frameZ), new THREE.Vector3(x - halfFrame, y - halfFrame, frameZ)]
         );
-        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.07, rowIndex === 0 ? 0.42 : 0.34, 8), materials.iron);
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.07, rowIndex === 0 ? 0.42 : 0.34, 12), materials.iron);
         barrel.rotation.x = side * Math.PI * 0.5;
         barrel.position.set(x, y, side * (width + (rowIndex === 0 ? 0.18 : 0.14)));
         barrel.name = "cannon barrel";
@@ -925,8 +931,8 @@ function addCannons(ship, stations, dims, type, variant, materials, representati
 }
 
 function sailGrid(width, height, billow, fill, edgeFill) {
-  const cols = 5;
-  const rows = 4;
+  const cols = 10;
+  const rows = 8;
   const positions = [];
   const indices = [];
   for (let row = 0; row <= rows; row += 1) {
@@ -962,21 +968,25 @@ function sailGrid(width, height, billow, fill, edgeFill) {
     (u - 0.5) * width * (0.88 + v * 0.12)
   );
   const seamSegments = [];
-  [0.2, 0.4, 0.6, 0.8].forEach((u) => {
-    for (let row = 0; row < rows; row += 1) seamSegments.push([pointAt(u, row / rows), pointAt(u, (row + 1) / rows)]);
-  });
-  [0.33, 0.66].forEach((v) => {
-    for (let col = 0; col < cols; col += 1) seamSegments.push([pointAt(col / cols, v), pointAt((col + 1) / cols, v)]);
-  });
+  for (const offset of [-0.012, 0.012]) {
+    [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9].forEach((u) => {
+      for (let row = 0; row < rows; row += 1) seamSegments.push([pointAt(u, row / rows, offset), pointAt(u, (row + 1) / rows, offset)]);
+    });
+    [0.25, 0.5, 0.75].forEach((v) => {
+      for (let col = 0; col < cols; col += 1) seamSegments.push([pointAt(col / cols, v, offset), pointAt((col + 1) / cols, v, offset)]);
+    });
+  }
   addLineSegments(sail, seamSegments, edgeFill, "stitched sail panels");
   const reefSegments = [];
-  [0.14, 0.3, 0.46, 0.62, 0.78, 0.9].forEach((u) => {
-    const center = pointAt(u, 0.34, 0.016);
-    reefSegments.push([
-      center.clone().add(new THREE.Vector3(0, -0.045, -0.018)),
-      center.clone().add(new THREE.Vector3(0, 0.045, 0.018))
-    ]);
-  });
+  for (const offset of [-0.016, 0.016]) {
+    [0.14, 0.3, 0.46, 0.62, 0.78, 0.9].forEach((u) => {
+      const center = pointAt(u, 0.34, offset);
+      reefSegments.push([
+        center.clone().add(new THREE.Vector3(0, -0.065, -0.018)),
+        center.clone().add(new THREE.Vector3(0, 0.045, 0.018))
+      ]);
+    });
+  }
   addLineSegments(sail, reefSegments, edgeFill, "reef points");
   return sail;
 }
@@ -990,6 +1000,27 @@ function flatSail(points, fill, edgeFill) {
   geometry.translate(0, 0, -0.0225);
   const sail = new THREE.Mesh(geometry, fill);
   sail.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 14), edgeFill));
+  const seams = [];
+  const minX = Math.min(...points.map(([x]) => x));
+  const maxX = Math.max(...points.map(([x]) => x));
+  for (let panel = 1; panel < 10; panel += 1) {
+    const x = THREE.MathUtils.lerp(minX, maxX, panel / 10);
+    const crossings = [];
+    points.forEach(([ax, ay], index) => {
+      const [bx, by] = points[(index + 1) % points.length];
+      if ((ax <= x && bx > x) || (bx <= x && ax > x)) crossings.push(ay + (by - ay) * (x - ax) / (bx - ax));
+    });
+    if (crossings.length !== 2) continue;
+    const low = Math.min(...crossings);
+    const high = Math.max(...crossings);
+    for (const z of [-0.026, 0.026]) {
+      seams.push([new THREE.Vector3(x, low, z), new THREE.Vector3(x, high, z)]);
+      for (let y = low + 0.12; y < high - 0.12; y += 0.18) {
+        seams.push([new THREE.Vector3(x - 0.015, y - 0.012, z), new THREE.Vector3(x + 0.015, y + 0.012, z)]);
+      }
+    }
+  }
+  addLineSegments(sail, seams, edgeFill, "hand-stitched canvas strips");
   return sail;
 }
 
@@ -1131,6 +1162,15 @@ function addSquareRig(ship, stations, dims, type, variant, materials, sailPivots
       const yard = cylinderBetween(new THREE.Vector3(0, yardY, -width * 0.58), new THREE.Vector3(0, yardY, width * 0.58), 0.04, materials.wood, 8, 0.025);
       yard.name = "yard";
       pivot.add(yard);
+      const footrope = tubeAlong([
+        new THREE.Vector3(0.08, yardY, -width * 0.55),
+        new THREE.Vector3(0.1, yardY - 0.22, -width * 0.27),
+        new THREE.Vector3(0.08, yardY - 0.13, 0),
+        new THREE.Vector3(0.1, yardY - 0.22, width * 0.27),
+        new THREE.Vector3(0.08, yardY, width * 0.55)
+      ], 0.009, materials.rope);
+      footrope.name = "yard footrope";
+      pivot.add(footrope);
       const liftY = Math.min(height * 0.94, yardY + height * 0.14);
       pivot.add(makeLine([
         new THREE.Vector3(0, liftY, 0),
@@ -1237,6 +1277,253 @@ function addFlag(ship, stations, dims, type, materials) {
   ship.add(flag);
 }
 
+function addCraftsmanship(ship, stations, dims, type, materials, cannons) {
+  // Bake only the new fixed fittings together. Rig pivots and muzzle transforms
+  // remain independent, and hundreds of small fittings cost a handful of draws.
+  const parts = new Map();
+  const add = (geometry, fill, position, rotation = new THREE.Euler()) => {
+    geometry.applyMatrix4(new THREE.Matrix4().compose(
+      new THREE.Vector3(...position), new THREE.Quaternion().setFromEuler(rotation), new THREE.Vector3(1, 1, 1)
+    ));
+    if (!parts.has(fill)) parts.set(fill, []);
+    parts.get(fill).push(geometry);
+  };
+  const box = (size, at, fill = materials.accent, rotation) => add(new THREE.BoxGeometry(...size), fill, at, rotation);
+  const rod = (from, to, radius, fill = materials.iron, segments = 6) => {
+    const piece = cylinderBetween(new THREE.Vector3(...from), new THREE.Vector3(...to), radius, fill, segments);
+    piece.updateMatrix();
+    piece.geometry.applyMatrix4(piece.matrix);
+    if (!parts.has(fill)) parts.set(fill, []);
+    parts.get(fill).push(piece.geometry);
+  };
+  const ring = (at, radius, thickness, fill = materials.iron, rotation = new THREE.Euler()) => {
+    add(new THREE.TorusGeometry(radius, thickness, 4, 12), fill, at, rotation);
+  };
+  const rope = (points, radius = 0.014) => {
+    const piece = tubeAlong(points.map((point) => new THREE.Vector3(...point)), radius, materials.rope);
+    if (!parts.has(materials.rope)) parts.set(materials.rope, []);
+    parts.get(materials.rope).push(piece.geometry);
+  };
+
+  // Offset butt joints follow the hull's actual loft, with paired treenails.
+  const shellPoint = (x, depth, side) => {
+    const index = Math.max(0, stations.findIndex((station) => station.x >= x) - 1);
+    const left = stations[index];
+    const right = stations[index + 1];
+    const t = (x - left.x) / (right.x - left.x);
+    const y = THREE.MathUtils.lerp(left.deckY - (left.deckY - left.keelY) * depth, right.deckY - (right.deckY - right.keelY) * depth, t);
+    const z = THREE.MathUtils.lerp(sideWidthAtDepth(left, depth), sideWidthAtDepth(right, depth), t);
+    return [x, y, side * (z + 0.018)];
+  };
+  for (const side of [-1, 1]) {
+    for (let course = 0; course < 6; course += 1) {
+      const top = 0.12 + course * 0.12;
+      for (let joint = 0; joint < 5; joint += 1) {
+        const x = dims.length * (-0.37 + joint * 0.15 + (course % 2) * 0.065);
+        rod(shellPoint(x, top + 0.015, side), shellPoint(x, top + 0.105, side), 0.005, materials.plank, 4);
+        for (const dx of [-0.035, 0.035]) {
+          add(new THREE.SphereGeometry(0.014, 5, 3), materials.wood, shellPoint(x + dx, top + 0.06, side));
+        }
+      }
+    }
+  }
+
+  // Gunport hinges, trunnions, carriage cheeks and iron trucks. These never
+  // extend ahead of the original muzzle, so smoke starts at the same opening.
+  for (const { barrel, side: sideName } of cannons) {
+    const side = sideName === "starboard" ? 1 : -1;
+    const { x, y, z } = barrel.position;
+    const innerZ = z - side * 0.2;
+    rod([x - 0.14, y, innerZ], [x + 0.14, y, innerZ], 0.035);
+    for (const offset of [-0.12, 0.12]) {
+      box([0.055, 0.13, 0.29], [x + offset, y - 0.09, innerZ], materials.wood);
+      for (const truck of [-0.095, 0.095]) {
+        add(new THREE.CylinderGeometry(0.05, 0.05, 0.032, 8), materials.iron,
+          [x + offset * 1.15, y - 0.17, innerZ + truck], new THREE.Euler(0, 0, Math.PI / 2));
+      }
+      box([0.026, 0.14, 0.02], [x + offset * 0.78, y + 0.24, innerZ + side * 0.04], materials.iron);
+      rod([x + offset * 0.78 - 0.025, y + 0.17, innerZ + side * 0.055],
+        [x + offset * 0.78 + 0.025, y + 0.17, innerZ + side * 0.055], 0.017);
+    }
+    ring([x, y, z - side * 0.06], 0.063, 0.01);
+    ring([x, y + 0.28, innerZ + side * 0.06], 0.03, 0.008);
+  }
+
+  // Frames and cross-mullions sit on the actual window surface, including
+  // transom glazing and the Galleon's upper gallery.
+  ship.children.filter((part) => /window$/.test(part.name)).forEach((window) => {
+    const { width: w, height: h, depth: d } = window.geometry.parameters;
+    const { x, y, z } = window.position;
+    const transom = w < d;
+    const breadth = transom ? d : w;
+    const outward = transom ? -1 : Math.sign(z);
+    const at = (u, v) => transom ? [x - w / 2 - 0.018, y + v, z + u] : [x + u, y + v, z + outward * (d / 2 + 0.018)];
+    for (const u of [-breadth / 2, 0, breadth / 2]) {
+      box(transom ? [0.035, h + 0.04, 0.025] : [0.025, h + 0.04, 0.035], at(u, 0));
+    }
+    for (const v of [-h / 2, 0, h / 2]) {
+      box(transom ? [0.035, 0.024, breadth + 0.045] : [breadth + 0.045, 0.024, 0.035], at(0, v));
+    }
+  });
+
+  for (const cabin of ship.children.filter((part) => /raised stern gallery|stepped upper sterncastle|raised forecastle/.test(part.name) && !part.name.endsWith("deck"))) {
+    const { width: length, height, depth: width } = cabin.geometry.parameters;
+    const { x, y } = cabin.position;
+    for (const side of [-1, 1]) {
+      for (let row = 1; row < 5; row += 1) {
+        box([length, 0.012, 0.018], [x, y - height / 2 + row * height / 5, side * (width / 2 + 0.011)], materials.plank);
+      }
+      for (const end of [-1, 1]) box([0.055, height, 0.045], [x + end * length * 0.47, y, side * width * 0.51]);
+      box([length * 1.02, 0.07, 0.06], [x, y + height * 0.4, side * width * 0.51]);
+    }
+    const front = x > 0 ? -1 : 1;
+    const doorX = x + front * (length / 2 + 0.025);
+    const doorH = Math.min(0.65, height * 0.82);
+    const doorY = y - height / 2 + doorH / 2;
+    box([0.035, doorH, 0.38], [doorX, doorY, 0], materials.wood);
+    for (const z of [-0.21, 0.21]) box([0.055, doorH + 0.05, 0.038], [doorX + front * 0.025, doorY, z]);
+    box([0.055, 0.04, 0.46], [doorX, doorY + doorH / 2, 0]);
+    for (const v of [-0.25, 0.25]) box([0.045, 0.025, 0.35], [doorX + front * 0.03, doorY + doorH * v, 0], materials.iron);
+    ring([doorX + front * 0.055, doorY, 0.12], 0.035, 0.01, materials.accent, new THREE.Euler(0, Math.PI / 2, 0));
+  }
+
+  for (const hatch of ship.children.filter((part) => part.name === "grated cargo hatch")) {
+    const { width, depth } = hatch.geometry.parameters;
+    const { x, y, z } = hatch.position;
+    box([width * 0.87, 0.012, depth * 0.88], [x, y + 0.071, z], materials.port);
+    for (let bar = -4; bar <= 4; bar += 1) {
+      box([0.022, 0.022, depth * 0.9], [x + bar * width * 0.1, y + 0.092, z], materials.deck);
+      box([width * 0.9, 0.022, 0.025], [x, y + 0.094, z + bar * depth * 0.1], materials.deck);
+    }
+    for (const side of [-1, 1]) ring([x, y + 0.1, z + side * depth * 0.48], 0.05, 0.012, materials.iron, new THREE.Euler(Math.PI / 2, 0, 0));
+  }
+
+  const capstan = ship.getObjectByName("capstan");
+  const { x: capX, y: capY } = capstan.position;
+  ring([capX, capY + 0.15, 0], 0.17, 0.025, materials.iron, new THREE.Euler(Math.PI / 2, 0, 0));
+  for (let index = 0; index < 4; index += 1) {
+    const angle = index * Math.PI / 2;
+    rod([capX + Math.cos(angle) * 0.12, capY + 0.13, Math.sin(angle) * 0.12],
+      [capX + Math.cos(angle) * 0.47, capY + 0.13, Math.sin(angle) * 0.47], 0.025, materials.wood);
+  }
+  for (const post of ship.children.filter((part) => part.name === "mooring bollard")) {
+    const { x, y, z } = post.position;
+    box([0.14, 0.025, 0.14], [x, y - 0.078, z], materials.iron);
+    rod([x - 0.11, y + 0.04, z], [x + 0.11, y + 0.04, z], 0.024, materials.wood);
+  }
+  for (const cargo of ship.children.filter((part) => part.name === "banded cargo barrel")) {
+    const body = cargo.children[0];
+    const { height, radiusTop } = body.geometry.parameters;
+    const { x, y, z } = cargo.position;
+    for (let stave = 0; stave < 12; stave += 1) {
+      const angle = stave * Math.PI / 6;
+      rod([x + Math.cos(angle) * radiusTop, y + height * 0.08, z + Math.sin(angle) * radiusTop],
+        [x + Math.cos(angle) * radiusTop, y + height * 0.98, z + Math.sin(angle) * radiusTop], 0.005, materials.plank, 4);
+    }
+    box([radiusTop * 1.7, 0.012, 0.018], [x, y + height + 0.005, z], materials.plank);
+    add(new THREE.CylinderGeometry(0.022, 0.022, 0.012, 6), materials.wood, [x, y + height + 0.01, z + radiusTop * 0.4]);
+  }
+
+  // The standing rig has paired deadeyes and lanyards at each shroud foot,
+  // belaying pins, and rope bindings; all are fixed to their supporting mast.
+  const masts = ship.children.filter((part) => part.name === "mast");
+  for (const mast of masts) {
+    const mastX = mast.position.x;
+    const baseY = deckAt(stations, mastX);
+    const halfBeam = widthAt(stations, mastX);
+    for (const side of [-1, 1]) {
+      for (let index = -1; index <= 1; index += 1) {
+        const x = mastX + index * 0.48 * (type === "sloop" ? 1.05 : type === "frigate" ? 1.18 : 1.08);
+        const z = side * halfBeam * (index === 0 ? 0.9 : 0.86);
+        for (const level of [0.12, 0.3]) {
+          add(new THREE.CylinderGeometry(0.06, 0.06, 0.042, 8), materials.wood, [x, baseY + level, z], new THREE.Euler(Math.PI / 2, 0, 0));
+          for (const hole of [-0.025, 0.025]) add(new THREE.CircleGeometry(0.009, 5), materials.port,
+            [x + hole, baseY + level, z + side * 0.025], new THREE.Euler(0, side < 0 ? Math.PI : 0, 0));
+        }
+        for (const offset of [-0.035, 0, 0.035]) rod([x + offset, baseY + 0.14, z + side * 0.025], [x + offset, baseY + 0.28, z + side * 0.025], 0.008, materials.rope, 4);
+      }
+      box([0.64, 0.06, 0.15], [mastX, baseY + 0.24, side * halfBeam * 0.67], materials.wood);
+      for (let pin = -2; pin <= 2; pin += 1) {
+        rod([mastX + pin * 0.12, baseY + 0.15, side * halfBeam * 0.67], [mastX + pin * 0.12, baseY + 0.34, side * halfBeam * 0.67], 0.017, materials.wood);
+      }
+    }
+    for (const fraction of [0.06, 0.09, 0.3, 0.48]) {
+      ring([mastX, baseY + mast.geometry.parameters.height * fraction, 0], 0.09, 0.017, materials.rope, new THREE.Euler(Math.PI / 2, 0, 0));
+    }
+  }
+
+  // Roof guardrails and planking make the elevated decks convincing from above.
+  for (const cabin of ship.children.filter((part) => part.name === "raised stern gallery")) {
+    const { width: length, height, depth: width } = cabin.geometry.parameters;
+    const { x, y } = cabin.position;
+    const roofY = y + height / 2 + 0.13;
+    for (let plank = -5; plank <= 5; plank += 1) box([length, 0.009, 0.009], [x, roofY, plank * width / 11], materials.plank);
+    for (const side of [-1, 1]) {
+      const z = side * width * 0.52;
+      rod([x - length / 2, roofY + 0.24, z], [x + length / 2, roofY + 0.24, z], 0.026, materials.accent);
+      for (let post = 0; post <= 8; post += 1) {
+        const px = x - length / 2 + post * length / 8;
+        rod([px, roofY, z], [px, roofY + 0.24, z], 0.017, materials.accent);
+      }
+    }
+    const stairsZ = -width * 0.3;
+    const deckY = y - height / 2;
+    const rise = roofY - deckY;
+    const run = 0.86;
+    const startX = x + length / 2 + run;
+    for (let step = 0; step < 8; step += 1) {
+      box([0.14, 0.045, 0.42], [startX - step * run / 8, deckY + (step + 1) * rise / 8, stairsZ], materials.deck);
+    }
+    for (const side of [-1, 1]) {
+      const z = stairsZ + side * 0.23;
+      rod([startX + 0.03, deckY + 0.08, z], [x + length / 2, roofY, z], 0.035, materials.wood);
+      rod([startX + 0.03, deckY + 0.35, z], [x + length / 2, roofY + 0.27, z], 0.02, materials.accent);
+      rod([startX + 0.03, deckY + 0.08, z], [startX + 0.03, deckY + 0.35, z], 0.02, materials.accent);
+    }
+  }
+  for (const deck of ship.children.filter((part) => /^(raised forecastle|stepped upper sterncastle) deck$/.test(part.name))) {
+    const { width, height, depth } = deck.geometry.parameters;
+    const { x, y, z } = deck.position;
+    for (let plank = -6; plank <= 6; plank += 1) {
+      box([width * 0.98, 0.008, 0.008], [x, y + height / 2 + 0.004, z + plank * depth / 14], materials.plank);
+    }
+  }
+  for (const lantern of ship.children.filter((part) => part.name === "stern lantern")) {
+    const { x, y, z } = lantern.position;
+    lantern.geometry.dispose();
+    lantern.geometry = new THREE.BoxGeometry(0.14, 0.19, 0.14);
+    lantern.material = materials.window;
+    for (const dx of [-0.08, 0.08]) for (const dz of [-0.08, 0.08]) box([0.018, 0.22, 0.018], [x + dx, y, z + dz], materials.iron);
+    box([0.2, 0.028, 0.2], [x, y - 0.12, z]);
+    add(new THREE.ConeGeometry(0.14, 0.12, 4), materials.accent, [x, y + 0.155, z], new THREE.Euler(0, Math.PI / 4, 0));
+    rod([x + 0.16, y - 0.3, z], [x, y - 0.3, z], 0.022);
+    rod([x, y - 0.3, z], [x, y - 0.13, z], 0.022);
+  }
+  const bowsprit = ship.getObjectByName("bowsprit");
+  const end = new THREE.Vector3(0, bowsprit.geometry.parameters.height * 0.43, 0).applyQuaternion(bowsprit.quaternion).add(bowsprit.position);
+  rope([[dims.length * 0.46, deckAt(stations, dims.length * 0.46) - 0.38, 0], [dims.length * 0.55, end.y - 0.32, 0], end.toArray()], 0.018);
+  for (const side of [-1, 1]) {
+    const x = dims.length * 0.34;
+    const y = deckAt(stations, x);
+    const z = side * (widthAt(stations, x) + 0.045);
+    rod([x - 0.13, y + 0.16, side * widthAt(stations, x) * 0.7], [x - 0.13, y + 0.16, z], 0.045, materials.wood);
+    rope([[x - 0.13, y + 0.16, z], [x - 0.1, y - 0.02, z + side * 0.03], [x, y + 0.04, z]], 0.018);
+    for (const angle of [-0.7, 0.7]) {
+      box([0.12, 0.12, 0.035], [x + Math.sign(angle) * 0.19, y - 0.74, z], materials.iron, new THREE.Euler(0, 0, angle));
+    }
+  }
+
+  const details = new THREE.Group();
+  details.name = "joined ship craftsmanship";
+  for (const [fill, geometries] of parts) {
+    const combined = new THREE.Mesh(mergeGeometries(geometries, false), fill);
+    combined.name = `${Object.keys(materials).find((key) => materials[key] === fill)} fittings`;
+    details.add(combined);
+    geometries.forEach((geometry) => geometry.dispose());
+  }
+  ship.add(details);
+}
+
 export function createShipModel(type, variantIndex = 0) {
   const classData = vesselCatalog[type];
   if (!classData) throw new Error(`Unknown vessel class: ${type}`);
@@ -1303,6 +1590,7 @@ export function createShipModel(type, variantIndex = 0) {
   if (type === "sloop") addSloopRig(ship, stations, dims, variant, materials, sailPivots);
   else addSquareRig(ship, stations, dims, type, variant, materials, sailPivots);
   addFlag(ship, stations, dims, type, materials);
+  addCraftsmanship(ship, stations, dims, type, materials, cannons);
 
   if (variant.patched) {
     sailPivots.forEach((pivot, index) => {

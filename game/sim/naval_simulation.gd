@@ -550,11 +550,13 @@ func _fire(ship: Dictionary, side: String) -> void:
 		return
 	var direction := Vector2.from_angle(ship["heading"] + (-PI / 2.0 if side == "port" else PI / 2.0))
 	var keel := Vector2.from_angle(ship["heading"])
+	var guns_in_row: int = Definitions.VESSELS[ship["vessel_id"]].get("guns_per_row", loads.size())
 	for i in loads.size():
 		if loads[i] != 1.0:
 			continue
 		loads[i] = 0.0
-		var muzzle: Vector2 = ship["position"] + keel * gun_offset(i, loads.size(), _radius(ship))
+		# A stacked battery shares keel stations across its decks in the 2D sim.
+		var muzzle: Vector2 = ship["position"] + keel * gun_offset(i % guns_in_row, guns_in_row, _radius(ship))
 		projectiles.append({
 			"id": next_projectile_id, "owner_id": ship["id"], "ammo": weapon["ammo"],
 			"position": muzzle, "direction": direction,

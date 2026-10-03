@@ -31,6 +31,12 @@ func _initialize() -> void:
 			quit(1)
 			return
 	match selected:
+		"ship-depth":
+			root.title = "Tortuga — ship depth verification"
+			for vessel in Definitions.VESSELS:
+				for heading in [0.0, PI / 2.0, PI, -PI / 2.0]:
+					snapshots.append({"label": "%s · 70° near / 61° mid / 43° far · heading %d°" % [vessel.capitalize(), roundi(rad_to_deg(heading))],
+						"kind": "ship_depth", "vessel": vessel, "heading": heading})
 		"two-enemies": snapshots = [
 			{"label": "A + B near · stable rows", "kind": "near"},
 			{"label": "A + B far · zoom floor, two edge markers", "kind": "far"},
@@ -49,7 +55,7 @@ func _initialize() -> void:
 			{"label": "Missed shot · splash (no impact)", "kind": "splash"},
 		]
 		_:
-			push_error("Unknown presentation demo case: " + selected + " (choose two-enemies, conditions)")
+			push_error("Unknown presentation demo case: " + selected + " (choose two-enemies, conditions, ship-depth)")
 			valid = false
 			quit(1)
 			return
@@ -82,6 +88,11 @@ func _process(_delta: float) -> bool:
 	caption = Label.new()
 	caption.add_theme_font_size_override("font_size", 18)
 	panel.add_child(caption)
+	var next_button := Button.new()
+	next_button.text = "Next snapshot"
+	next_button.position = Vector2(1090, 135)
+	next_button.pressed.connect(func(): show_snapshot((index + 1) % snapshots.size()))
+	main.get_node("UI").add_child(next_button)
 	if smoke:
 		for i in snapshots.size():
 			show_snapshot(i)
@@ -99,9 +110,15 @@ func _process(_delta: float) -> bool:
 
 
 func show_snapshot(next: int) -> void:
+	if index >= 0 and not smoke and snapshots[index].kind == "ship_depth":
+		print("Native model sample: %s; %.0f FPS, %.6f s process, %.0f draw calls, %.0f primitives" % [
+			snapshots[index].label, Performance.get_monitor(Performance.TIME_FPS),
+			Performance.get_monitor(Performance.TIME_PROCESS),
+			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)])
 	index = next
 	var kind: String = snapshots[index]["kind"]
-	main.start_encounter("two_sloops", "frigate")
+	main.start_encounter("two_sloops", snapshots[index].get("vessel", "frigate"))
 	# Clone the reset state; fixture edits affect this snapshot only, never definitions or sim rules.
 	var sim = main.sim
 	sim.ships = sim.ships.duplicate(true)
@@ -109,6 +126,12 @@ func show_snapshot(next: int) -> void:
 	var origin: Vector2 = player["position"]
 	var raw_events := []
 	match kind:
+		"ship_depth":
+			sim.wind_heading = PI / 2.0
+			player["heading"] = snapshots[index].heading
+			for id in [2, 3]:
+				sim.ships[id] = sim.make_ship(id, sim.TEAM_OPPOSITION, player.vessel_id,
+					origin + Vector2(250.0 * (id - 1), 0), player.heading)
 		"near":
 			sim.ships[2]["position"] = origin + Vector2(0, -300)
 			sim.ships[3]["position"] = origin + Vector2(0, 300)
@@ -162,6 +185,12 @@ func show_snapshot(next: int) -> void:
 	main.arena_view.reset_effects()  # Snap to this synthetic snapshot, not the preset's prior camera.
 	main.arena_view.sync(sim)
 	main.arena_view._fit_camera(0.0)
+	if kind == "ship_depth":
+		# Hold the production zoom floor so all three comparison ships stay visible.
+		main.arena_view.set_process(false)
+		main.arena_view.camera.zoom = Vector2.ONE * Presentation.ZOOM_MIN
+		main.arena_view.camera.position = origin + Vector2(180, 0)
+		main.arena_view.camera.force_update_scroll()
 	main.hud.refresh(sim)
 	# Same per-tick path as main.advance_tick(): raw shots -> one volley -> audio/visuals.
 	var events: Array = Presentation.normalize_events(raw_events)
@@ -182,6 +211,11 @@ func show_snapshot(next: int) -> void:
 func check_snapshot(kind: String, events: Array) -> void:
 	var sim = main.sim
 	var hud = main.hud
+	if kind == "ship_depth":
+		var views: Dictionary = main.arena_view._ships
+		_check(views[1].elevation_degrees > views[2].elevation_degrees
+			and views[2].elevation_degrees > views[3].elevation_degrees, "camera pitch flattens with distance")
+		return
 	_check(hud.target_label.text.contains("Sloop A") and hud.second_target_label.text.contains("Sloop B"), "stable A/B rows")
 	if kind in ["far", "same_edge", "corner"]:
 		var view = main.arena_view

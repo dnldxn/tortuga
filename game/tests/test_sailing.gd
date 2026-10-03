@@ -9,6 +9,7 @@ const EXPECTED_VESSELS := {
 	"sloop": {"full_speed": 116.64, "turn_rate": 1.2, "hull": 100.0, "sails": 70.0, "crew": 60.0, "guns_per_side": 4, "base_reload": 7.0, "radius": 27.5},
 	"brig": {"full_speed": 93.96, "turn_rate": 0.85, "hull": 160.0, "sails": 100.0, "crew": 90.0, "guns_per_side": 6, "base_reload": 8.0, "radius": 35.0},
 	"frigate": {"full_speed": 71.28, "turn_rate": 0.6, "hull": 240.0, "sails": 140.0, "crew": 140.0, "guns_per_side": 8, "base_reload": 9.0, "radius": 42.5},
+	"galleon": {"full_speed": 55.08, "turn_rate": 0.45, "hull": 360.0, "sails": 190.0, "crew": 220.0, "guns_per_side": 16, "base_reload": 11.0, "radius": 55.25},
 }
 
 

@@ -6,7 +6,7 @@ const NavalSimulation := preload("res://sim/naval_simulation.gd")
 
 const DT := 1.0 / 60.0
 const EPS := 1e-6
-const VESSEL_IDS := ["sloop", "brig", "frigate"]
+const VESSEL_IDS := ["sloop", "brig", "frigate", "galleon"]
 const SHOOTER := Vector2(2500, 2100)
 
 
@@ -173,6 +173,18 @@ func _test_both_sides_and_missing(t) -> void:
 	t.check(sides == ["port", "port", "port", "port", "port", "port", "starboard", "starboard", "starboard", "starboard", "starboard", "starboard"], "both sides fire together, port first")
 	var dirs := _of_type(both, "shot").map(func(e): return e["direction"])
 	t.check(_vec_near(dirs[0], Vector2(0, -1), 1e-6) and _vec_near(dirs[11], Vector2(0, 1), 1e-6), "port fires north, starboard south at heading 0")
+	var galleon = _sim("galleon")
+	galleon.step(DT, {1: {"fire_port": true, "fire_starboard": true}})
+	var shots := _of_type(galleon, "shot")
+	t.check(shots.size() == 32 and galleon.projectiles.size() == 32, "Galleon fires all 32 mounted guns")
+	for side in Definitions.SIDES:
+		var battery := shots.filter(func(e): return e["side"] == side)
+		t.check(battery.map(func(e): return e["gun_index"]) == range(16), "Galleon %s indexes both decks in order" % side)
+		for gun in 8:
+			t.check(battery[gun]["position"].is_equal_approx(battery[gun + 8]["position"]),
+				"Galleon %s deck pair %d shares a 2D keel station" % [side, gun])
+	galleon.step(DT, {1: {"fire_port": true, "fire_starboard": true}})
+	t.check(_of_type(galleon, "shot").is_empty(), "Galleon cannot refire before reloading")
 
 
 func _test_projectile_id_order(t) -> void:
@@ -218,6 +230,7 @@ func _test_gun_spread(t) -> void:
 	for vessel_id in VESSEL_IDS:
 		var vessel: Dictionary = Definitions.VESSELS[vessel_id]
 		var n: int = vessel["guns_per_side"]
+		var guns_in_row: int = vessel.get("guns_per_row", n)
 		for heading in [0.0, 0.7, -2.5]:
 			for side in ["port", "starboard"]:
 				var sim = _sim(vessel_id)
@@ -232,7 +245,7 @@ func _test_gun_spread(t) -> void:
 				var ok: bool = shots.size() == n and sim.projectiles.size() == n
 				for k in shots.size():
 					var offset: Vector2 = shots[k]["position"] - center
-					ok = ok and absf(offset.dot(keel) - NavalSimulation.gun_offset(k, n, vessel["radius"])) <= 1e-3
+					ok = ok and absf(offset.dot(keel) - NavalSimulation.gun_offset(k % guns_in_row, guns_in_row, vessel["radius"])) <= 1e-3
 					ok = ok and absf(offset.dot(beam)) <= 1e-3
 					ok = ok and shots[k]["direction"] == beam and sim.projectiles[k]["direction"] == beam
 				var label := "%s heading %s %s" % [vessel_id, heading, side]

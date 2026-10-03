@@ -18,6 +18,7 @@ func run(t) -> bool:
 	view = main.arena_view
 	view.set_process(false)
 	_test_camera_config(t)
+	_test_distance_angles(t)
 	for vessel_id in Definitions.VESSELS:
 		_test_vessel(t, vessel_id)
 	_test_restart_snaps_camera(t)
@@ -70,7 +71,7 @@ func _test_camera_config(t) -> void:
 	var cam: Camera2D = view.camera
 	t.check([cam.limit_left, cam.limit_top, cam.limit_right, cam.limit_bottom] == [-240, -240, 6240, 4440],
 		"camera limits include 240 world-unit decoration")
-	t.check(cam.zoom == Vector2.ONE, "camera zoom 1")
+	t.check(cam.zoom == Vector2.ONE * 2.0, "default camera zoom doubled to 2")
 	t.check(not cam.position_smoothing_enabled, "camera uses only exponential manual smoothing")
 	t.check(cam.ignore_rotation, "camera ignores rotation")
 	t.check(not (cam.get_parent() is CanvasLayer) and main.hud.get_parent() is CanvasLayer, "UI on CanvasLayer, camera in world")
@@ -85,6 +86,14 @@ func _test_vessel(t, vessel_id: String) -> void:
 	var snap := _snapshot()
 	view.sync(main.sim)
 	t.check(_snapshot() == snap, "%s: view sync does not mutate sim" % vessel_id)
+	var colored_surfaces := 0
+	for mesh in _descendants_of_type(_player_node().model_instance, "MeshInstance3D"):
+		for surface in mesh.mesh.get_surface_count():
+			if mesh.mesh.surface_get_format(surface) & Mesh.ARRAY_FORMAT_COLOR:
+				colored_surfaces += 1
+				t.check(mesh.get_active_material(surface).vertex_color_use_as_albedo,
+					"%s: procedural hull/deck colors enabled in Godot" % vessel_id)
+	t.check(colored_surfaces >= 2, "%s: hull and deck retain colored planks" % vessel_id)
 	var active: Array = main.sim.ships.keys().filter(func(id): return main.sim.ships[id]["active"])
 	var nodes := _ship_nodes()
 	t.check(nodes.size() == active.size() and nodes.size() == 2, "%s: one ship node per active ship (player + target)" % vessel_id)
@@ -93,7 +102,7 @@ func _test_vessel(t, vessel_id: String) -> void:
 	t.check(node.position == ship["position"], "%s: node position matches sim" % vessel_id)
 	t.near(node.rotation, 0.0, 1e-5, "%s: 2D adapter stays fixed while 3D hull turns" % vessel_id)
 	t.near(node.heading_pivot.rotation.y, -node.visual_yaw_for_heading(ship["heading"]), 1e-5,
-		"%s: 3D yaw follows heading through 30-degree projection" % vessel_id)
+		"%s: 3D yaw follows heading through the current projection" % vessel_id)
 	t.check(absf(ship["heading"]) > 0.01, "%s: heading actually changed during test" % vessel_id)
 	var radius: float = Definitions.VESSELS[vessel_id]["radius"]
 	t.near(ShipView.DISPLAY_REFERENCE_WIDTH * node.display_sprite.scale.x, 2.0 * radius, 0.5,
@@ -103,18 +112,23 @@ func _test_vessel(t, vessel_id: String) -> void:
 	var camera_target := Vector3(0.0, ShipView.CAMERA_TARGET_Y[vessel_id], 0.0)
 	var camera_offset: Vector3 = node.model_camera.position - camera_target
 	var camera_angle := rad_to_deg(atan2(camera_offset.y, camera_offset.z))
-	t.near(camera_angle, 30.0, 0.1, "%s: model camera is 30 degrees above horizontal" % vessel_id)
+	t.near(camera_angle, 70.0, 0.1, "%s: focus ship is viewed 70 degrees above horizontal" % vessel_id)
 	var every_heading_fits := true
 	var projected_records := []
-	for cardinal in [0.0, PI / 2.0, PI, -PI / 2.0]:
-		for wind_offset in [0.0, PI / 2.0, -PI / 2.0]:
-			node.set_ship_state(cardinal, cardinal + wind_offset, 0.0, false, 1.0, 1.0)
-			var projected := _projected_model_bounds(node)
-			projected_records.append(projected)
-			every_heading_fits = (every_heading_fits and projected.position.x >= -1.0
-				and projected.position.y >= -1.0 and projected.end.x <= ShipView.VIEWPORT_SIZE.x + 1.0
-				and projected.end.y <= ShipView.VIEWPORT_SIZE.y + 1.0)
-	t.check(every_heading_fits, "%s: complete wind-trimmed rig stays in frame through cardinal turns %s"
+	for distance in [0.0, 400.0, 800.0]:
+		node.set_view_distance(distance)
+		var origin_pixel: Vector2 = node.model_camera.unproject_position(Vector3.ZERO)
+		var origin_world: Vector2 = node.display_sprite.to_global(origin_pixel - Vector2(ShipView.VIEWPORT_SIZE) * 0.5)
+		t.check(origin_world.distance_to(node.global_position) < 0.001, "%s: distance %.0f keeps hull origin on sim position" % [vessel_id, distance])
+		for cardinal in [0.0, PI / 2.0, PI, -PI / 2.0]:
+			for wind_offset in [0.0, PI / 2.0, -PI / 2.0]:
+				node.set_ship_state(cardinal, cardinal + wind_offset, 0.0, false, 1.0, 1.0)
+				var projected := _projected_model_bounds(node)
+				projected_records.append(projected)
+				every_heading_fits = (every_heading_fits and projected.position.x >= -1.0
+					and projected.position.y >= -1.0 and projected.end.x <= ShipView.VIEWPORT_SIZE.x + 1.0
+					and projected.end.y <= ShipView.VIEWPORT_SIZE.y + 1.0)
+	t.check(every_heading_fits, "%s: complete rig stays in frame at all camera angles and cardinal turns %s"
 		% [vessel_id, projected_records])
 	view.sync(main.sim)
 	var previous_trim: float = node.sail_pivots[0].rotation.y
@@ -137,6 +151,30 @@ func _test_vessel(t, vessel_id: String) -> void:
 	t.check(node.motion_pivot.rotation != before_motion and absf(node.motion_pivot.rotation.x) < deg_to_rad(1.0),
 		"%s: speed drives sub-degree rocking" % vessel_id)
 	t.check(view.camera.position.distance_to(main.sim.ships[1]["position"]) <= 160.0, "%s: camera bias bounded from player" % vessel_id)
+
+
+func _test_distance_angles(t) -> void:
+	main.start_practice("galleon")
+	var focus: Vector2 = main.sim.ships[1]["position"]
+	var near_ship = view._ships[1]
+	for distance in [-10.0, 0.0, 200.0, 400.0, 600.0, 800.0, 1600.0]:
+		main.sim.ships[2]["position"] = focus + Vector2(maxf(distance, 0.0), 0)
+		var before := _snapshot()
+		view.sync(main.sim)
+		t.check(_snapshot() == before, "distance camera leaves simulation unchanged")
+		t.near(near_ship.elevation_degrees, 70.0, 0.001, "player always has the overhead camera")
+		var far_ship = view._ships[2]
+		var expected: float = 70.0 if distance <= 0.0 else (30.0 if distance >= 800.0 else 70.0 - 40.0 * smoothstep(0.0, 800.0, distance))
+		t.near(far_ship.elevation_degrees, expected, 0.001, "distant ship camera angle at %.0f" % distance)
+		for heading in [PI / 4.0, -PI / 3.0]:
+			far_ship.set_ship_state(heading, 0.0, 0.0, false, 1.0, 1.0)
+			var origin: Vector2 = far_ship.model_camera.unproject_position(Vector3.ZERO)
+			var bow: Vector2 = far_ship.model_camera.unproject_position(far_ship.heading_pivot.to_global(Vector3.RIGHT))
+			t.check((bow - origin).normalized().dot(Vector2.from_angle(heading)) > 0.99999, "distance camera preserves the projected heading")
+	main.spectate_id = 2
+	view.sync(main.sim)
+	t.near(view._ships[2].elevation_degrees, 70.0, 0.001, "spectating moves the near-camera focus")
+	main.return_to_selection()
 
 
 func _test_restart_snaps_camera(t) -> void:

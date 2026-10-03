@@ -6,6 +6,8 @@ const ARENA_MARGIN := 160.0
 
 ## Reef Glass presentation tuning; never used by simulation movement or contacts.
 const PRESENTATION := {
+	"zoom_multiplier": 2.0, "zoom_min": 1.5, "zoom_max": 2.2,
+	"ship_near_angle": 70.0, "ship_far_angle": 30.0, "ship_angle_distance": 800.0,
 	"ui_margin": 12.0, "top_reserved": 160.0, "bottom_reserved": 160.0,
 	"combat_inset": 24.0, "side_reserved": 32.0,
 	"art_padding": 24.0, "player_padding": 80.0, "readiness_spacing": 9.0,
@@ -14,8 +16,8 @@ const PRESENTATION := {
 	"arc_height": 12.0, "arc_close": 35.0, "arc_full": 180.0,
 	"arc_default_range": .45, "muzzle_blend_distance": 45.0, "muzzle_max_correction": 32.0,
 	"smoke_ticks": 60, "smoke_radius": 10.0, "smoke_drift": 12.0,
-	# 32 guns, two overlapping loads; impact+smoke+damage/defeat headroom.
-	"cue_capacity": 256, "cannon_voices": 64,
+	# Four Galleons plus opposition: both batteries, impacts and fading smoke.
+	"cue_capacity": 512, "cannon_voices": 64,
 	"cannon_db": -40.0, "cannon_pitch_variation": .025,
 	"cannon_level_variation": .6, "chain_rotation_per_unit": .10,
 	"audio_pan_extent": .55, "audio_distance": 1400.0, "audio_far_gain": .65,
@@ -52,6 +54,13 @@ const VESSELS := {
 		"full_speed": 71.28, "turn_rate": 0.6,
 		"hull": 240.0, "sails": 140.0, "crew": 140.0,
 		"guns_per_side": 8, "base_reload": 9.0, "radius": 42.5,
+	},
+	"galleon": {
+		"display_name": "Galleon",
+		"description": "Largest hull, two gun decks, slowest turns",
+		"full_speed": 55.08, "turn_rate": 0.45,
+		"hull": 360.0, "sails": 190.0, "crew": 220.0,
+		"guns_per_side": 16, "guns_per_row": 8, "base_reload": 11.0, "radius": 55.25,
 	},
 }
 

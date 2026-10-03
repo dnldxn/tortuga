@@ -254,7 +254,7 @@ func _test_invalid_ops(t) -> bool:
 		["non-Dictionary op", "add_captain"],
 		["captain id below 100", {"op": "add_captain", "ship_id": 99, "vessel_id": "sloop"}],
 		["float captain id", {"op": "add_captain", "ship_id": 101.0, "vessel_id": "sloop"}],
-		["unknown vessel", {"op": "add_captain", "ship_id": 101, "vessel_id": "galleon"}],
+		["unknown vessel", {"op": "add_captain", "ship_id": 101, "vessel_id": "unknown_ship"}],
 		["missing vessel", {"op": "add_captain", "ship_id": 101}],
 		["linger an AI ship", {"op": "linger", "ship_id": 2}],
 		["linger an unknown id", {"op": "linger", "ship_id": 555}],

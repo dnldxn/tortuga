@@ -3,8 +3,8 @@ extends RefCounted
 
 const Definitions := preload("res://sim/definitions.gd")
 const SAFE := Rect2(32, 160, 1216, 400)
-const ZOOM_MIN := 0.75
-const ZOOM_MAX := 1.10
+const ZOOM_MIN: float = Definitions.PRESENTATION.zoom_min
+const ZOOM_MAX: float = Definitions.PRESENTATION.zoom_max
 const CAMERA_MARGIN := 240.0
 const LETTERS := "ABCD"
 const GLYPHS := {"triangle": "▲", "diamond": "◆", "square": "■", "ring": "●"}
@@ -26,7 +26,7 @@ static func padded_art_half(radius: float, heading: float) -> Vector2:
 
 static func zoom_for_extent(extent: Vector2, half_safe: Vector2) -> float:
 	return clampf(minf(half_safe.x / maxf(extent.x, 1.0),
-		half_safe.y / maxf(extent.y, 1.0)), ZOOM_MIN, ZOOM_MAX)
+		half_safe.y / maxf(extent.y, 1.0)) * Definitions.PRESENTATION.zoom_multiplier, ZOOM_MIN, ZOOM_MAX)
 
 
 static func approach(value: float, target: float, rate: float, dt: float) -> float:

@@ -113,7 +113,7 @@ func run(t) -> bool:
 	var before_sim: Dictionary = main.sim.ships.duplicate(true)
 	for heading in [0.0, PI / 2, PI, -PI / 2]:
 		ship["heading"] = heading
-		for zoom in [.75, 1.1]:
+		for zoom in [1.5, 2.2]:
 			view.camera.zoom = Vector2.ONE * zoom
 			var strips: Dictionary = view.readiness_geometry(main.sim, ship.position, Rect2(0, 0, 1280, 720))
 			var port: Dictionary = strips.port
