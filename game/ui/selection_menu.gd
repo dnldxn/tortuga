@@ -1,9 +1,10 @@
 extends Control
-## Mode select (practice / duels / two sloops / Settings / Quit, plus the version and update
+## Mode select (practice / duels / two sloops / Multiplayer / Settings + Quit, plus the version and update
 ## controls) -> vessel select. start_requested carries the chosen preset id and vessel id.
 ## The update controls only display what main feeds them (show_version / show_update_state).
 
 signal start_requested(preset_id: String, vessel_id: String)
+signal multiplayer_requested
 signal quit_requested
 signal settings_requested
 signal check_updates_requested
@@ -23,6 +24,7 @@ const GUIDANCE := "Sink the enemy, or exhaust its sails or crew. Turn a broadsid
 
 var sailing_button: Button
 var duel_buttons := {}  # preset id -> Button
+var multiplayer_button: Button
 var settings_button: Button
 var quit_button: Button
 var notice_label: Label
@@ -54,6 +56,8 @@ func _ready() -> void:
 	duel_buttons["duel_frigate"] = _button("Frigate duel")
 	duel_buttons["two_sloops"] = _button("Two-ship encounter — two sloops")
 	column.append_array([duel_buttons["duel_sloop"], duel_buttons["duel_brig"], duel_buttons["duel_frigate"], duel_buttons["two_sloops"]])
+	multiplayer_button = _button("Multiplayer")
+	column.append(multiplayer_button)
 	var guidance := Label.new()
 	guidance.text = GUIDANCE
 	guidance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -64,9 +68,12 @@ func _ready() -> void:
 	notice_label.custom_minimum_size = Vector2(420, 0)
 	notice_label.hide()
 	column.append(notice_label)
-	settings_button = _button("Settings")
-	quit_button = _button("Quit")
-	column.append_array([settings_button, quit_button])
+	# Settings and Quit share a row so the Multiplayer button keeps the panel within 720 px.
+	settings_button = _button("Settings", 0)
+	quit_button = _button("Quit", 0)
+	for button in [settings_button, quit_button]:
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.append(_row([settings_button, quit_button]))
 	# Two compact rows so the update block never pushes a button off a 720 px screen.
 	version_label = Label.new()
 	update_status_label = Label.new()
@@ -104,12 +111,13 @@ func _ready() -> void:
 	vessel_column.append_array([start_button, back_button])
 	_vessel_screen = _screen(vessel_column)
 
-	link_focus([sailing_button] + duel_buttons.values() + [settings_button, quit_button,
+	link_focus([sailing_button] + duel_buttons.values() + [multiplayer_button, settings_button, quit_button,
 			check_updates_button, update_button, full_download_button])
 	link_focus(vessel_buttons.values() + [start_button, back_button])
 	sailing_button.pressed.connect(_show_vessels.bind("practice"))
 	for preset_id in duel_buttons:
 		duel_buttons[preset_id].pressed.connect(_show_vessels.bind(preset_id))
+	multiplayer_button.pressed.connect(multiplayer_requested.emit)
 	settings_button.pressed.connect(settings_requested.emit)
 	quit_button.pressed.connect(quit_requested.emit)
 	check_updates_button.pressed.connect(check_updates_requested.emit)
@@ -157,7 +165,7 @@ func show_update_state(state: String, detail: String) -> void:
 	update_button.visible = state in ["available", "downloading"]
 	update_button.disabled = downloading
 	full_download_button.visible = state == "full_download"
-	for button in [sailing_button, settings_button] + duel_buttons.values():
+	for button in [sailing_button, multiplayer_button, settings_button] + duel_buttons.values():
 		button.disabled = downloading
 	if focused in [update_button, full_download_button] and not focused.visible:
 		check_updates_button.grab_focus()  # don't strand keyboard focus on a hidden button

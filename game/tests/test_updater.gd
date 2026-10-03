@@ -114,9 +114,9 @@ func _emit_state(main: Node, state: String, detail := "") -> void:
 	main.update_service.state_changed.emit(state, detail)
 
 
-## The five mode buttons plus Settings (everything a download locks except Quit).
+## The five mode buttons, Multiplayer and Settings (everything a download locks except Quit).
 func _locked_buttons(sel) -> Array:
-	return [sel.sailing_button, sel.settings_button] + sel.duel_buttons.values()
+	return [sel.sailing_button, sel.multiplayer_button, sel.settings_button] + sel.duel_buttons.values()
 
 
 func _all_disabled(buttons: Array) -> bool:

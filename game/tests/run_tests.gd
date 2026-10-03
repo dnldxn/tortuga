@@ -24,6 +24,7 @@ const SUITES: Array[String] = [
 	"res://tests/test_settings.gd",
 	"res://tests/test_settings_ui.gd",
 	"res://tests/test_presentation.gd",
+	"res://tests/test_battle_presentation.gd",
 	"res://tests/test_hud_layout.gd",
 	"res://tests/test_muzzle_mapping.gd",
 	"res://tests/test_battle_mode.gd",
@@ -31,6 +32,9 @@ const SUITES: Array[String] = [
 	"res://tests/test_protocol.gd",
 	"res://tests/test_battle.gd",
 	"res://tests/test_session.gd",
+	"res://tests/test_multiplayer_config.gd",
+	"res://tests/test_snapshot_buffer.gd",
+	"res://tests/test_multiplayer_ui.gd",
 	"res://tests/test_updater.gd",  # keep last: loaded packs persist and switch res:// to pack DirAccess
 ]
 

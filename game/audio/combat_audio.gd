@@ -131,8 +131,9 @@ func cannon_mix(event: Dictionary) -> Dictionary:
 		projected.x = clampf(projected.x, screen.x * (.5 - tuning.audio_pan_extent * .5), screen.x * (.5 + tuning.audio_pan_extent * .5))
 		projected.y = screen.y * .5
 		position = transform.affine_inverse() * projected
-		if sim.ships.has(sim.PLAYER_ID):
-			gain = lerpf(1.0, tuning.audio_far_gain, clampf(source.distance_to(sim.ships[sim.PLAYER_ID]["position"]) / tuning.audio_distance, 0.0, 1.0))
+		var focus_id: int = arena_view.main.focus_ship_id()
+		if sim.ships.has(focus_id):
+			gain = lerpf(1.0, tuning.audio_far_gain, clampf(source.distance_to(sim.ships[focus_id]["position"]) / tuning.audio_distance, 0.0, 1.0))
 	var variation: float = float(int(event.get("projectile_id", dispatch_counts["cannon"])) % 7 - 3) / 3.0
 	return {"position": position, "volume_db": tuning.cannon_db + linear_to_db(gain) - absf(variation) * tuning.cannon_level_variation,
 		"pitch": 1.0 + variation * tuning.cannon_pitch_variation}

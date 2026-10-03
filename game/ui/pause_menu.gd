@@ -64,17 +64,26 @@ func _ready() -> void:
 
 ## Refreshed on every pause so guidance matches the encounter and bindings are live.
 func show_help(sim) -> void:
-	guidance_label.text = GUIDANCE
-	if sim.preset_id != "practice":
-		guidance_label.text = DUEL_GUIDANCE + "\n" + ESCAPE_HINT % [
-			Bindings.binding_label("cycle_port"), Bindings.binding_label("cycle_starboard"),
-			Bindings.binding_label("fire_port"), Bindings.binding_label("fire_starboard"),
-			Bindings.binding_label("toggle_sails"),
-			Bindings.binding_label("turn_left"), Bindings.binding_label("turn_right")]
-	bindings_label.text = "%s/%s steer · %s sails · %s pause · %s reset\n%s fire Port · %s fire Starboard · %s cycle Port · %s cycle Starboard" % [
+	guidance_label.text = guidance_text(sim.preset_id)
+	bindings_label.text = bindings_text()
+
+
+static func guidance_text(preset_id: String) -> String:
+	if preset_id == "practice":
+		return GUIDANCE
+	return DUEL_GUIDANCE + "\n" + ESCAPE_HINT % [
+		Bindings.binding_label("cycle_port"), Bindings.binding_label("cycle_starboard"),
+		Bindings.binding_label("fire_port"), Bindings.binding_label("fire_starboard"),
+		Bindings.binding_label("toggle_sails"),
+		Bindings.binding_label("turn_left"), Bindings.binding_label("turn_right")]
+
+
+## Live key bindings; shared battles have no reset, and their Esc opens a menu that never pauses.
+static func bindings_text(include_reset := true) -> String:
+	var reset := " · %s reset" % Bindings.binding_label("reset_practice") if include_reset else ""
+	return "%s/%s steer · %s sails · %s %s%s\n%s fire Port · %s fire Starboard · %s cycle Port · %s cycle Starboard" % [
 		Bindings.binding_label("turn_left"), Bindings.binding_label("turn_right"),
-		Bindings.binding_label("toggle_sails"), Bindings.binding_label("pause"),
-		Bindings.binding_label("reset_practice"),
+		Bindings.binding_label("toggle_sails"), Bindings.binding_label("pause"), "pause" if include_reset else "menu", reset,
 		Bindings.binding_label("fire_port"), Bindings.binding_label("fire_starboard"),
 		Bindings.binding_label("cycle_port"), Bindings.binding_label("cycle_starboard")]
 

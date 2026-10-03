@@ -6,6 +6,9 @@ const SAFE := Rect2(32, 160, 1216, 400)
 const ZOOM_MIN := 0.75
 const ZOOM_MAX := 1.10
 const CAMERA_MARGIN := 240.0
+const LETTERS := "ABCD"
+const GLYPHS := {"triangle": "▲", "diamond": "◆", "square": "■", "ring": "●"}
+const SLOT_COLORS := [Color("56b4e9"), Color("f0e442"), Color("cc79a7"), Color.WHITE]  # captain slot 0-3 (initial tuning)
 
 
 static func gameplay_rect(screen: Vector2) -> Rect2:
@@ -55,7 +58,8 @@ static func normalize_events(events: Array) -> Array:
 			"hit":
 				output.append({"type": "hit", "projectile_id": event["projectile_id"],
 					"target_id": event["victim_id"], "position": event["position"],
-					"track": event["track"], "damage": event["damage"], "ammo": event["ammo"]})
+					"track": event["track"], "damage": event["damage"], "ammo": event["ammo"],
+					"owner_id": event.get("owner_id", -1)})
 			"splash":
 				output.append({"type": "splash", "projectile_id": event["projectile_id"], "position": event["position"]})
 			"fire_rejected":
@@ -69,20 +73,71 @@ static func normalize_events(events: Array) -> Array:
 	return output
 
 
-static func ship_label(sim, id: int) -> String:
+## Opposition ships, active or not, in stable id order (index = letter and shape).
+static func opposition_ids(sim) -> Array:
+	var ids := []
+	for id in sim.ships:
+		if sim.ships[id]["team"] == sim.TEAM_OPPOSITION:
+			ids.append(id)
+	ids.sort()
+	return ids
+
+
+static func _letter(sim, id: int) -> String:
+	return LETTERS[clampi(opposition_ids(sim).find(id), 0, LETTERS.length() - 1)]
+
+
+## captains: ship_id -> {"name", "slot"}; offline it is empty and output is unchanged.
+static func ship_label(sim, id: int, captains := {}) -> String:
+	if captains.has(id):
+		return captains[id]["name"]
+	if sim.ships[id]["team"] != sim.TEAM_OPPOSITION:
+		return "Ally"
 	if sim.preset_id == "practice":
 		return "Target"
-	if sim.ships.has(3):
-		return "Sloop A" if id == 2 else "Sloop B"
-	return "Enemy A (%s)" % sim.ships[id]["vessel_id"].capitalize()
+	var vessel: String = Definitions.VESSELS[sim.ships[id]["vessel_id"]]["display_name"]
+	if opposition_ids(sim).size() == 1:
+		return "Enemy %s (%s)" % [_letter(sim, id), vessel]
+	return "%s %s" % [vessel, _letter(sim, id)]
 
 
-static func marker_badge(sim, id: int) -> String:
+static func marker_badge(sim, id: int, captains := {}) -> String:
 	if sim.preset_id == "practice":
-		return ship_label(sim, id).to_upper()
-	if sim.ships.has(3):
-		return ship_label(sim, id).trim_prefix("Sloop ")
-	return ship_label(sim, id).get_slice(" (", 0)
+		return "TARGET"
+	if captains.has(id):
+		return "%d %s" % [captains[id]["slot"] + 1, short_name(captains[id]["name"])]
+	if sim.ships[id]["team"] != sim.TEAM_OPPOSITION:
+		return ship_label(sim, id, captains)
+	if opposition_ids(sim).size() == 1:
+		return "Enemy A"
+	return _letter(sim, id)
+
+
+static func identity_shape(sim, id: int) -> String:
+	if sim.ships[id]["team"] != sim.TEAM_OPPOSITION:
+		return "ring"
+	return ["triangle", "diamond", "square"][clampi(opposition_ids(sim).find(id), 0, 2)]
+
+
+static func short_name(name: String, limit := 10) -> String:
+	return name.left(limit - 1) + "…" if name.length() > limit else name
+
+
+static func slot_color(slot: int) -> Color:
+	return SLOT_COLORS[clampi(slot, 0, SLOT_COLORS.size() - 1)]
+
+
+## Captain ships other than the own one still in the battle, by id.
+static func ally_ids(sim, captains: Dictionary, own_id: int) -> Array:
+	var ids := captains.keys().filter(func(id): return id != own_id and sim.ships.has(id))
+	ids.sort()
+	return ids
+
+
+## Hull/sails/crew as rounded percentages of the vessel maximum, e.g. "H 75% S 64% C 100%".
+static func condition_short(ship: Dictionary) -> String:
+	var vessel: Dictionary = Definitions.VESSELS[ship["vessel_id"]]
+	return "H %d%% S %d%% C %d%%" % ["hull", "sails", "crew"].map(func(stat): return roundi(100.0 * ship[stat] / vessel[stat]))
 
 
 ## Full logical viewport inside expanded arena AND player inside gameplay safe region.

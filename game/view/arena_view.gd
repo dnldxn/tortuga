@@ -138,24 +138,25 @@ func _process(delta: float) -> void:
 			advance_effects(false)
 	sync(main.sim)
 	for ship_view in _ships.values():
-		if ship_view.visible and main.mode == "sailing":
+		if ship_view.visible and main.mode in ["sailing", "battle", "battle_result"]:
 			ship_view.advance_motion(delta)
-	if main.mode == "sailing" or (main.mode == "result" and not main.combat_audio.paused):
+	if main.mode in ["sailing", "battle", "battle_result"] or (main.mode == "result" and not main.combat_audio.paused):
 		_fit_camera(delta)
 	marker_canvas.queue_redraw()
 
 
-## Smoothed framing around the player and all active enemies. Practice follows the player.
+## Smoothed framing around the focus ship and nearby active enemies. Practice follows the player.
 func _fit_camera(delta: float) -> void:
 	var sim = main.sim
-	if not sim.ships.has(sim.PLAYER_ID):
+	var focus_id: int = main.focus_ship_id()
+	if not sim.ships.has(focus_id):
 		return
 	var screen := get_viewport_rect().size
 	if screen != _screen_size:
 		_screen_size = screen
 		_nearby.clear()
 		_camera_snap = true
-	var player: Vector2 = sim.ships[sim.PLAYER_ID]["position"]
+	var player: Vector2 = sim.ships[focus_id]["position"]
 	var bounds: Rect2 = _active_bounds(sim)
 	var desired_center: Vector2 = player + (bounds.get_center() - player).limit_length(160.0)
 	var extent := Vector2.ZERO
@@ -175,16 +176,19 @@ func _fit_camera(delta: float) -> void:
 	queue_redraw()
 
 
-## Padded art bounds of player and at most two nearby active opponents.
+## Padded art bounds of the focus ship and at most two nearby active ships of the other team.
 func _active_bounds(sim) -> Rect2:
-	var player: Vector2 = sim.ships[sim.PLAYER_ID]["position"]
+	var focus_id: int = main.focus_ship_id()
+	if not sim.ships.has(focus_id):  # a shared battle before its first snapshot
+		return Rect2(camera.position, Vector2.ZERO)
+	var player: Vector2 = sim.ships[focus_id]["position"]
 	var ids := []
 	for id in _nearby.keys():
 		if not sim.ships.has(id) or not sim.ships[id]["active"]:
 			_nearby.erase(id)
 	for id in sim.ships:
 		var ship: Dictionary = sim.ships[id]
-		if ship["team"] != sim.TEAM_OPPOSITION or not ship["active"]:
+		if ship["team"] == sim.ships[focus_id]["team"] or not ship["active"]:
 			_nearby.erase(id)
 			continue
 		var distance: float = player.distance_to(ship["position"])
@@ -199,7 +203,7 @@ func _active_bounds(sim) -> Rect2:
 		_nearby.erase(id)
 	var low := player
 	var high := player
-	var framed := [sim.PLAYER_ID]
+	var framed := [focus_id]
 	framed.append_array(ids.slice(0, 2))
 	for id in framed:
 		var ship: Dictionary = sim.ships[id]
@@ -237,7 +241,9 @@ func sync(sim) -> void:
 
 
 func _desired_camera_center(sim) -> Vector2:
-	var player: Vector2 = sim.ships[sim.PLAYER_ID]["position"]
+	if not sim.ships.has(main.focus_ship_id()):
+		return camera.position
+	var player: Vector2 = sim.ships[main.focus_ship_id()]["position"]
 	var bounds: Rect2 = _active_bounds(sim)
 	return player + (bounds.get_center() - player).limit_length(160.0)
 
@@ -304,17 +310,31 @@ func _draw_combat() -> void:
 		draw_arc(p, r, 0, TAU, 32, TARGET_INK, 3.0)
 		var title := "TARGET · %s" % (" / ".join(ship["defeat_reasons"]).to_upper() if not ship["active"] else "BRIG")
 		_draw_text(font, p + Vector2(-50, -r - 12), title, TARGET_INK)
-	if sim.ships.has(3):
-		for id in [2, 3]:
+	var opposition: Array = Presentation.opposition_ids(sim)
+	if opposition.size() >= 2:
+		for id in opposition:
 			var enemy: Dictionary = sim.ships[id]
 			if enemy["active"] and _ship_label_visible(enemy):
 				var p: Vector2 = enemy["position"]
 				var ink := ENEMY_INK
-				if id == 2:
-					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -54), p + Vector2(-7, -40), p + Vector2(7, -40)]), ink)
-				else:
-					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -55), p + Vector2(-7, -46), p + Vector2(0, -38), p + Vector2(7, -46)]), ink)
-				_draw_text(font, p + Vector2(15, -38), Presentation.ship_label(sim, id), ink)
+				match Presentation.identity_shape(sim, id):
+					"triangle":
+						draw_colored_polygon(PackedVector2Array([p + Vector2(0, -54), p + Vector2(-7, -40), p + Vector2(7, -40)]), ink)
+					"diamond":
+						draw_colored_polygon(PackedVector2Array([p + Vector2(0, -55), p + Vector2(-7, -46), p + Vector2(0, -38), p + Vector2(7, -46)]), ink)
+					_:
+						draw_rect(Rect2(p + Vector2(-6, -52), Vector2(12, 12)), ink)
+				_draw_text(font, p + Vector2(15, -38), Presentation.ship_label(sim, id, main.captains), ink)
+	# Allies: slot color plus slot number and ring, so color is never the only cue.
+	for id in Presentation.ally_ids(sim, main.captains, main.own_ship_id):
+		var ally: Dictionary = sim.ships[id]
+		var p: Vector2 = ally["position"]
+		var r: float = Definitions.VESSELS[ally["vessel_id"]]["radius"] + 14
+		var ink := Presentation.slot_color(main.captains[id]["slot"])
+		draw_arc(p, r, 0, TAU, 48, ink, 3.0)
+		if _ship_label_visible(ally):
+			var text := ally_label(sim, id)
+			_draw_text(font, p + Vector2(-font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x * .5, -r - 10), text, ink)
 	for shot in sim.projectiles:
 		_draw_projectile(shot)
 	for cue in _cues:
@@ -370,10 +390,22 @@ func _marker_edge(point: Vector2, safe: Rect2) -> String:
 
 
 func _marker_label(sim, id: int) -> String:
-	var label: String = Presentation.marker_badge(sim, id)
-	if sim.preset_id != "practice":
-		label += " • %s wu" % _distance_label(roundi(sim.ships[id]["position"].distance_to(sim.ships[sim.PLAYER_ID]["position"]) / 10.0) * 10)
+	if _is_ally(id):
+		return ally_label(sim, id)
+	var label: String = Presentation.marker_badge(sim, id, main.captains)
+	var focus: Dictionary = sim.ships.get(main.focus_ship_id(), {})
+	if sim.preset_id != "practice" and not focus.is_empty():
+		label += " • %s wu" % _distance_label(roundi(sim.ships[id]["position"].distance_to(focus["position"]) / 10.0) * 10)
 	return label
+
+
+## Badge plus " · AWAY" while a captain's ship lingers after they left.
+func ally_label(sim, id: int) -> String:
+	return Presentation.marker_badge(sim, id, main.captains) + (" · AWAY" if sim.ships[id]["lingering"] else "")
+
+
+func _is_ally(id: int) -> bool:
+	return main.captains.has(id) and id != main.own_ship_id
 
 
 func _distance_label(distance: int) -> String:
@@ -392,7 +424,7 @@ func enemy_markers(sim, center: Vector2, screen: Rect2) -> Dictionary:
 	var safe := Presentation.gameplay_rect(screen.size)
 	for id in ids:
 		var enemy: Dictionary = sim.ships[id]
-		if enemy["team"] != sim.TEAM_OPPOSITION or not enemy["active"]:
+		if not enemy["active"] or (enemy["team"] != sim.TEAM_OPPOSITION and not _is_ally(id)):
 			continue
 		var radius: float = Definitions.VESSELS[enemy["vessel_id"]]["radius"]
 		var projected: Vector2 = get_canvas_transform() * enemy["position"]
@@ -432,7 +464,7 @@ func indicator_geometry(sim, center: Vector2, screen: Rect2) -> Dictionary:
 		var direction: Vector2 = (sim.ships[id]["position"] - center).normalized()
 		var arrow: Vector2 = markers[id]
 		geometry[id] = {"arrow": arrow, "badge": arrow - direction * 22,
-			"true_edge": _marker_edges[id], "identity": Presentation.marker_badge(sim, id)}
+			"true_edge": _marker_edges[id], "identity": Presentation.marker_badge(sim, id, main.captains)}
 	return geometry
 
 
@@ -450,6 +482,8 @@ func _draw_marker() -> void:
 		var direction: Vector2 = (target - center).normalized()
 		var across := direction.orthogonal()
 		var ink := ENEMY_INK if sim.preset_id != "practice" else TARGET_INK
+		if _is_ally(id):
+			ink = Presentation.slot_color(main.captains[id]["slot"])
 		var true_edge: Vector2 = geometry[id]["true_edge"]
 		if p != true_edge:
 			marker_canvas.draw_line(true_edge, p - direction * 8, ink, 1.5)
@@ -457,12 +491,18 @@ func _draw_marker() -> void:
 		marker_canvas.draw_colored_polygon(PackedVector2Array([p + direction * 16,
 			p - direction * 7 + across * 8, p - direction * 7 - across * 8]), ink)
 		var badge: Vector2 = geometry[id]["badge"]
-		if sim.ships.has(3) and id == 3:
-			marker_canvas.draw_colored_polygon(PackedVector2Array([badge + direction * 6, badge + across * 6,
-				badge - direction * 6, badge - across * 6]), ink)
-		else:
-			marker_canvas.draw_colored_polygon(PackedVector2Array([badge + direction * 7,
-				badge - direction * 5 + across * 6, badge - direction * 5 - across * 6]), ink)
+		match Presentation.identity_shape(sim, id):
+			"diamond":
+				marker_canvas.draw_colored_polygon(PackedVector2Array([badge + direction * 6, badge + across * 6,
+					badge - direction * 6, badge - across * 6]), ink)
+			"square":
+				marker_canvas.draw_colored_polygon(PackedVector2Array([badge + (direction + across) * 5,
+					badge + (across - direction) * 5, badge - (direction + across) * 5, badge + (direction - across) * 5]), ink)
+			"ring":
+				marker_canvas.draw_arc(badge, 6, 0, TAU, 16, ink, 3.0)
+			_:
+				marker_canvas.draw_colored_polygon(PackedVector2Array([badge + direction * 7,
+					badge - direction * 5 + across * 6, badge - direction * 5 - across * 6]), ink)
 		var label := _marker_label(sim, id)
 		var rect := marker_label_rect(sim, id, p, center, screen)
 		marker_canvas.draw_rect(rect, Color(0.04, 0.07, 0.12, 0.95))
@@ -503,9 +543,9 @@ func _buoy(at: Vector2) -> void:
 
 ## Logical screen geometry: actual ship sides, bow-to-stern gun order and upright counts.
 func readiness_geometry(sim, center: Vector2, screen: Rect2) -> Dictionary:
-	if not sim.result.is_empty() or not sim.ships.has(1) or not sim.ships[1]["active"]:
+	var ship: Dictionary = sim.ships.get(main.own_ship_id, {})
+	if not sim.result.is_empty() or ship.is_empty() or not ship["active"]:
 		return {}
-	var ship: Dictionary = sim.ships[1]
 	var tuning: Dictionary = Definitions.PRESENTATION
 	var forward := Vector2.from_angle(ship["heading"])
 	var across := Vector2.from_angle(ship["heading"] + PI / 2.0)
@@ -547,7 +587,7 @@ func _ship_label_visible(ship: Dictionary) -> bool:
 
 
 func combat_indicators_visible() -> bool:
-	return main != null and main.mode == "sailing" and not main.settings_menu.visible
+	return main != null and main.mode in ["sailing", "battle"] and not main.settings_menu.visible
 
 
 func projectile_render_position(shot: Dictionary) -> Vector2:
