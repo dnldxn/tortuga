@@ -3,13 +3,16 @@ extends RefCounted
 ## result hashing. Expected ERROR lines come from deliberately bad bytes_to_var input.
 
 const Protocol := preload("res://net/protocol.gd")
+const ServerMain := preload("res://net/server_main.gd")
+const BotMain := preload("res://net/bot_main.gd")
 const NavalSimulation := preload("res://sim/naval_simulation.gd")
 const DT := 1.0 / 60.0
 const FIRST := NavalSimulation.FIRST_CAPTAIN_SHIP_ID
 
 
 func run(t) -> bool:
-	for test in [_test_messages, _test_snapshot, _test_steer_turn, _test_result_hash, _test_cli]:
+	for test in [_test_messages, _test_snapshot, _test_steer_turn, _test_result_hash, _test_cli,
+			_test_server_options, _test_stop_requested, _test_bot_options]:
 		t.check(test.call(t) == true, "protocol: %s completed" % test.get_method())
 	return true
 
@@ -144,4 +147,57 @@ func _test_result_hash(t) -> bool:
 func _test_cli(t) -> bool:
 	t.check(Protocol.parse_cli(PackedStringArray(["--server", "--port", "24681", "--bot"]))
 		== {"server": true, "port": "24681", "bot": true}, "protocol: parse_cli")
+	return true
+
+
+func _test_server_options(t) -> bool:
+	var o: Dictionary = ServerMain.server_options({"port": "24681", "password": "a"}, "", "")
+	t.check(o["port"] == 24681 and o["password"] == "a" and o["error"] == "", "server_options: args")
+	o = ServerMain.server_options({}, "envpw", "24682")
+	t.check(o["port"] == 24682 and o["password"] == "envpw" and o["error"] == "", "server_options: env")
+	o = ServerMain.server_options({"port": "24683", "password": "argpw"}, "envpw", "24682")
+	t.check(o["port"] == 24683 and o["password"] == "argpw", "server_options: args beat env")
+	t.check(ServerMain.server_options({"password": "a"}, "", "")["error"] == "port required (--port or TORTUGA_SERVER_PORT)",
+		"server_options: port required")
+	t.check(ServerMain.server_options({"port": "24681"}, "", "")["error"]
+		== "password required (--password or TORTUGA_SERVER_PASSWORD)", "server_options: password required")
+	for bad in ["0", "70000", "x"]:
+		t.check(ServerMain.server_options({"port": bad, "password": "a"}, "", "")["error"] == "bad port %s" % bad,
+			"server_options: bad port %s" % bad)
+	t.check(ServerMain.server_options({"port": "1", "password": "a", "stop-file": "/tmp/s"}, "", "")["stop_file"] == "/tmp/s",
+		"server_options: stop_file passes through")
+	t.check(ServerMain.server_options({"port": "1", "password": "a"}, "", "")["stop_file"] == "",
+		"server_options: no stop_file")
+	return true
+
+
+func _test_stop_requested(t) -> bool:
+	var path := "user://stop_probe"
+	DirAccess.remove_absolute(path)
+	t.check(not ServerMain.stop_requested(path, -1), "stop_requested: absent file")
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string("stop")
+	f.close()
+	var mtime := FileAccess.get_modified_time(path)
+	t.check(ServerMain.stop_requested(path, -1), "stop_requested: created file")
+	t.check(not ServerMain.stop_requested(path, mtime), "stop_requested: unchanged mtime")
+	DirAccess.remove_absolute(path)
+	t.check(not FileAccess.file_exists(path), "stop_requested: probe removed")
+	return true
+
+
+func _test_bot_options(t) -> bool:
+	t.check(BotMain.bot_options({}) == {"host": "127.0.0.1", "port": 24680, "password": "", "name": "Bot",
+		"captain_id": "bot-Bot", "preset": "duel_sloop", "vessel": "sloop", "join": false, "loop": false,
+		"idle": false, "seconds": 0.0, "error": ""}, "bot_options: defaults")
+	var o: Dictionary = BotMain.bot_options({"join": true, "loop": true, "idle": true, "name": "Ann",
+		"seconds": "5", "vessel": "brig"})
+	t.check(o["join"] and o["loop"] and o["idle"] and o["name"] == "Ann" and o["captain_id"] == "bot-Ann"
+		and o["seconds"] == 5.0 and o["vessel"] == "brig" and o["error"] == "", "bot_options: maps through")
+	o = BotMain.bot_options({"host": "10.0.0.2", "port": "24690", "password": "pw", "captain-id": "c1",
+		"preset": "duel_brig"})
+	t.check(o["host"] == "10.0.0.2" and o["port"] == 24690 and o["password"] == "pw" and o["captain_id"] == "c1"
+		and o["preset"] == "duel_brig" and o["error"] == "", "bot_options: host/port/password/captain-id/preset")
+	for bad in [{"preset": "practice"}, {"vessel": "galleon"}, {"seconds": "x"}, {"port": "0"}, {"port": "x"}]:
+		t.check(BotMain.bot_options(bad)["error"] != "", "bot_options: error for %s" % [bad])
 	return true

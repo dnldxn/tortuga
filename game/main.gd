@@ -49,6 +49,12 @@ var _reset_queued := false  # reset_practice pressed since the last tick
 
 
 func _ready() -> void:
+	# Dedicated server / headless bot: leave before settings, input, audio or UI exist.
+	var args := OS.get_cmdline_user_args()
+	for role in ["server", "bot"]:
+		if "--" + role in args:
+			get_tree().change_scene_to_file.call_deferred("res://net/%s_main.tscn" % role)
+			return
 	get_window().min_size = Vector2i(1280, 720)
 	$UI.layer = 2
 	Bindings.install_defaults()

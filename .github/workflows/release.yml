@@ -45,6 +45,8 @@ jobs:
           cp ~/godot/templates/* "$T/"
       - name: Test
         run: bash game/tests/run_settings_checks.sh
+      - name: Server smoke
+        run: bash game/tests/run_server_smoke.sh
       - name: Pick version
         run: |
           N=$(gh release list --limit 1000 --json tagName \
