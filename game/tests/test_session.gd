@@ -12,6 +12,8 @@ const FIRST := NavalSimulation.FIRST_CAPTAIN_SHIP_ID
 
 
 func run(t) -> bool:
+	t.check(SessionServer._safe("  Bo b\nSRV x \t") == "__Bo_b_SRV_x__" and SessionServer._safe("Anne") == "Anne",
+		"session: log values lose whitespace and control characters")
 	for test in [_test_auth_refusals, _test_harbor_captains, _test_full_and_replaced, _test_server_stop,
 			_test_battle_join_and_harbor, _test_steering_actions_events, _test_defeat_and_victory, _test_lost,
 			_test_four_battles, _test_leave_reclaim_abandon, _test_escape, _test_pause_and_reclaim, _test_linger_expiry,
@@ -564,6 +566,10 @@ func _test_leave_reclaim_abandon(t) -> bool:
 	t.check(a.battle_id == 0 and a.ship_id == 0 and not a.ship_active, "session: leave clears A's battle")
 	var lingering_listed := func(): return _harbor_entry(a, 1).get("lingering_here") == true
 	t.check(_pump(all, lingering_listed), "session: A's harbor shows lingering_here")
+	# Events for a battle the client has left are dropped (injected: the server no longer sends them).
+	var stale := Protocol.encode_message({"t": "events", "battle_id": 1, "events": [{"type": "probe", "tick": 1}]})
+	a._on_peer_packet(1, stale)
+	t.check(_events_of(a, "probe").is_empty(), "session: events for a battle A left are not emitted")
 	t.check(server.captain_by_id("anne").state == "harbor" and server.captain_by_id("anne").battle_id == 0,
 		"session: A's record is in the harbor")
 	t.check(_harbor_entry(a, 1).get("can_join") == true, "session: A can rejoin its lingering ship")
@@ -581,6 +587,9 @@ func _test_leave_reclaim_abandon(t) -> bool:
 		"session: A and B get ship_reclaimed")
 	t.check(not battle.sim.ships[FIRST]["lingering"] and battle.sim.ships[FIRST]["vessel_id"] == "sloop",
 		"session: the reclaimed ship is the same sloop, commanded again")
+	a._on_peer_packet(1, stale)
+	a._on_peer_packet(1, Protocol.encode_message({"t": "events", "battle_id": 2, "events": [{"type": "probe", "tick": 1}]}))
+	t.check(_events_of(a, "probe").size() == 1, "session: only the current battle's events are emitted")
 	a.join_battle(1, "sloop")
 	t.check(_refusal(server, clients, a) == "already_in_battle", "session: joining again -> already_in_battle")
 	a.join_battle(99, "sloop")

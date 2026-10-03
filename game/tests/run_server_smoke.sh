@@ -5,7 +5,7 @@
 # SMOKE_PORT overrides the UDP port (default 24690).
 set -euo pipefail
 
-test -n "${GODOT:-}" && test -x "$GODOT"
+[ -x "${GODOT:-}" ] || { echo "GODOT must be an executable absolute path"; exit 1; }
 case "$GODOT" in /*) ;; *) echo "GODOT must be an absolute path"; exit 1 ;; esac
 cd "$(dirname "$0")/../.."
 mkdir -p /tmp/opencode
@@ -118,6 +118,9 @@ for who in anne bonny; do
 	snapshots=$(sed -n 's/^BOT summary .* snapshots=\([0-9]*\) .*/\1/p' "$log")
 	[ "${snapshots:-0}" -ge 20 ] || fail "$who: snapshots=${snapshots:-?} (want >= 20)" "$log"
 	grep '^BOT summary ' "$log"
+done
+for log in server anne bonny wrong; do
+	! grep -q 'SCRIPT ERROR' "$ROOT/$log.log" || fail "SCRIPT ERROR in $log.log" "$ROOT/$log.log"
 done
 grep '^SRV stopped ' "$ROOT/server.log"
 echo "Server smoke: OK"

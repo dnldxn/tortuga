@@ -190,7 +190,7 @@ func _on_auth(peer: int, data: PackedByteArray) -> void:
 	elif captains.values().filter(func(c): return c.captain_id != hello["captain_id"]).size() >= Definitions.MAX_CAPTAINS:
 		reason = "server_full"
 	if reason != "":
-		_log("SRV auth refuse peer=%d reason=%s client_version=%s" % [peer, reason, client_version])
+		_log("SRV auth refuse peer=%d reason=%s client_version=%s" % [peer, reason, _safe(client_version)])
 		_mp.send_auth(peer, var_to_bytes({"ok": false, "reason": reason, "server_version": _version}))
 		_disconnect_peer(peer)
 		return
@@ -202,7 +202,7 @@ func _on_auth(peer: int, data: PackedByteArray) -> void:
 	var old := captain_by_id(captain_id)
 	if not old.is_empty():
 		slot = old.slot
-		_log("SRV replace captain=%s old_peer=%d new_peer=%d" % [captain_name, old.peer, peer])
+		_log("SRV replace captain=%s old_peer=%d new_peer=%d" % [_safe(captain_name), old.peer, peer])
 		if old.connected:
 			_send(old, {"t": "replaced"})
 		_detach(old)
@@ -215,7 +215,7 @@ func _on_auth(peer: int, data: PackedByteArray) -> void:
 		while slot in used:
 			slot += 1
 	captains[peer] = _new_record(peer, captain_id, captain_name, slot)
-	_log("SRV auth accept peer=%d captain=%s slot=%d client_version=%s" % [peer, captain_name, slot, client_version])
+	_log("SRV auth accept peer=%d captain=%s slot=%d client_version=%s" % [peer, _safe(captain_name), slot, _safe(client_version)])
 	_mp.send_auth(peer, var_to_bytes({"ok": true, "server_version": _version, "slot": slot}))
 	_mp.complete_auth(peer)
 
@@ -237,7 +237,7 @@ func _on_peer_connected(peer: int) -> void:
 		return
 	var c: Dictionary = captains[peer]
 	c.connected = true
-	_log("SRV join captain=%s slot=%d peer=%d" % [c.name, c.slot, peer])
+	_log("SRV join captain=%s slot=%d peer=%d" % [_safe(c.name), c.slot, peer])
 	_harbor_dirty = true
 
 
@@ -247,7 +247,7 @@ func _on_peer_disconnected(peer: int) -> void:
 	var c: Dictionary = captains[peer]
 	_detach(c)
 	_log("SRV leave captain=%s received=%d applied=%d bytes_in=%d bytes_out=%d" % [
-		c.name, c.received, c.applied, c.bytes_in, c.bytes_out])
+		_safe(c.name), c.received, c.applied, c.bytes_in, c.bytes_out])
 	captains.erase(peer)
 	_harbor_dirty = true
 
@@ -321,7 +321,7 @@ func _on_start_battle(c: Dictionary, msg: Dictionary) -> void:
 	battles[id] = battle
 	battle.add_captain(c.captain_id, c.name, c.slot, vessel_id)
 	_enter(c, battle)
-	_log("SRV battle start id=%d preset=%s by=%s" % [id, preset_id, c.name])
+	_log("SRV battle start id=%d preset=%s by=%s" % [id, preset_id, _safe(c.name)])
 
 
 func _on_join_battle(c: Dictionary, msg: Dictionary) -> void:
@@ -351,7 +351,7 @@ func _on_join_battle(c: Dictionary, msg: Dictionary) -> void:
 		battle.add_captain(cid, c.name, c.slot, msg["vessel_id"])
 	_leave_for_other(c, id)
 	_enter(c, battle)
-	_log("SRV battle %s id=%d captain=%s ship=%d" % [kind, id, c.name, battle.ship_of[cid]])
+	_log("SRV battle %s id=%d captain=%s ship=%d" % [kind, id, _safe(c.name), battle.ship_of[cid]])
 
 
 ## The captain commands its ship in `battle` from now on; it gets `joined` with every captain name.
@@ -443,7 +443,7 @@ func _on_outcome(battle, o: Dictionary) -> void:
 		_send(c, {"t": "outcome", "battle_id": battle.battle_id, "ship_id": o.ship_id, "outcome": o.outcome,
 			"elapsed": o.elapsed})
 	var captain_name: String = battle.names.get(o.ship_id, {}).get("name", o.captain_id)
-	_log("SRV outcome battle=%d captain=%s ship=%d outcome=%s" % [battle.battle_id, captain_name, o.ship_id, o.outcome])
+	_log("SRV outcome battle=%d captain=%s ship=%d outcome=%s" % [battle.battle_id, _safe(captain_name), o.ship_id, o.outcome])
 	if not c.is_empty() and c.battle_id == battle.battle_id and (c.state == "in_battle" or c.state == "spectating"):
 		if o.outcome == "sunk" or o.outcome == "disabled":
 			c.state = "spectating"
@@ -508,6 +508,16 @@ func _sorted(keys: Array) -> Array:
 func _by_slot(records: Array) -> Array:
 	var out := records.duplicate()
 	out.sort_custom(func(a, b): return a.slot < b.slot)
+	return out
+
+
+## A value for a log line: whitespace and control characters become "_" so it cannot split a
+## key=value line or forge one (the stored name is untouched).
+static func _safe(value: String) -> String:
+	var out := ""
+	for i in value.length():
+		var code := value.unicode_at(i)
+		out += "_" if code <= 32 or code == 127 else value[i]
 	return out
 
 

@@ -129,10 +129,10 @@ func _process(_d: float) -> void:
 		if t >= _next_fire_s:
 			_client.send_action("fire_port" if _fires % 2 == 0 else "fire_starboard")
 			_fires += 1
-			_next_fire_s += FIRE_EVERY_S
+			_next_fire_s += FIRE_EVERY_S * (floorf((t - _next_fire_s) / FIRE_EVERY_S) + 1.0)  # skip slots missed in a hitch
 		if t >= _next_cycle_s:
 			_client.send_action("cycle_port")
-			_next_cycle_s += CYCLE_EVERY_S
+			_next_cycle_s += CYCLE_EVERY_S * (floorf((t - _next_cycle_s) / CYCLE_EVERY_S) + 1.0)
 
 
 func _on_auth_refused(reason: String, server_version: String) -> void:

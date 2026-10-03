@@ -238,8 +238,10 @@ func _on_peer_packet(_peer: int, packet: PackedByteArray) -> void:
 			_last_snapshot_tick = -1
 			joined.emit(msg)
 		"events":
-			if msg.get("events") is Array:
-				events_received.emit(int(msg.get("battle_id", 0)), msg["events"])
+			# Like snapshots: only the current battle (a stale message for one we left is dropped).
+			var events_battle := int(msg.get("battle_id", 0))
+			if msg.get("events") is Array and battle_id != 0 and events_battle == battle_id:
+				events_received.emit(events_battle, msg["events"])
 		"outcome":
 			# The server sends only our own outcomes; one for a battle we already left (an
 			# abandoned ship after joining elsewhere) must not touch the current battle.
