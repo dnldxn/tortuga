@@ -5,6 +5,7 @@ config.json
 
 /game/.godot/
 /build/phase-2/
+/build/phase-3/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

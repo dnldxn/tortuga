@@ -20,7 +20,7 @@ jobs:
         id: godot
         with:
           path: ~/godot
-          key: godot-4.7.2-stable-v1
+          key: godot-4.7.2-stable-v2
       - name: Download Godot (cache miss)
         if: steps.godot.outputs.cache-hit != 'true'
         run: |
@@ -34,7 +34,8 @@ jobs:
           EOF
           unzip -q Godot_v4.7.2-stable_linux.x86_64.zip
           unzip -q Godot_v4.7.2-stable_export_templates.tpz templates/version.txt \
-            templates/linux_release.x86_64 templates/windows_release_x86_64.exe templates/macos.zip
+            templates/linux_release.x86_64 templates/linux_release.arm64 \
+            templates/windows_release_x86_64.exe templates/macos.zip
           rm Godot_v4.7.2-stable_linux.x86_64.zip Godot_v4.7.2-stable_export_templates.tpz
           chmod +x Godot_v4.7.2-stable_linux.x86_64
       - name: Set up Godot

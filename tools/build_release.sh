@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
-# Build one release: 3 full builds, 3 packs, update.json.
+# Build one release: 3 full builds, 3 packs, update.json, linux-arm64 server archive (+ .sha256).
 # Usage (repo root; absolute $GODOT + 4.7.2 templates): bash tools/build_release.sh 0.N <outdir>
 set -euo pipefail
 
 V="${1:?usage: build_release.sh 0.N <outdir>}"
 [[ "$V" =~ ^0\.[0-9]+$ ]] || { echo "version must be 0.N" >&2; exit 2; }
 test -x "${GODOT:?set GODOT}"
+# Stock linux arm64 release template = the dedicated server binary (no export preset: base ID).
+case "$(uname -s)" in
+	Darwin) TPL="$HOME/Library/Application Support/Godot" ;;
+	*) TPL="${XDG_DATA_HOME:-$HOME/.local/share}/godot" ;;
+esac
+TPL="$TPL/export_templates/$("$GODOT" --version | cut -d. -f1-4)/linux_release.arm64"
+test -f "$TPL" || { echo "missing $TPL" >&2; exit 2; }
 mkdir -p "${2:?outdir required}"
 OUT="$(cd "$2" && pwd)"
 STAGE="$(mktemp -d)"
@@ -33,6 +40,16 @@ for p in windows macos linux; do
 done
 (cd "$STAGE/windows" && python3 -m zipfile -c "$OUT/Tortuga-$V-windows.zip" Tortuga.exe Tortuga.pck)
 tar -czf "$OUT/Tortuga-$V-linux.tar.gz" -C "$STAGE/linux" Tortuga.x86_64 Tortuga.pck
+# Server: template + linux pack (Godot loads <exe>.pck) + override.cfg (live stdout for journald).
+# The top dir names the version; the asset name is fixed for releases/latest/download/.
+S="$STAGE/server/tortuga-server-$V"
+mkdir -p "$S"
+cp "$TPL" "$S/tortuga-server"
+chmod 755 "$S/tortuga-server"
+cp "$OUT/tortuga-$V-linux.pck" "$S/tortuga-server.pck"
+printf '[application]\n\nrun/flush_stdout_on_print=true\n' > "$S/override.cfg"
+COPYFILE_DISABLE=1 tar -czf "$OUT/tortuga-server-linux-arm64.tar.gz" -C "$STAGE/server" "tortuga-server-$V"
+(cd "$OUT" && sha256sum tortuga-server-linux-arm64.tar.gz > tortuga-server-linux-arm64.tar.gz.sha256)
 
 python3 - "$V" "$BASE" "$OUT" <<'PY'
 import hashlib, json, sys
