@@ -172,10 +172,9 @@ func _test_harbor_captains(t) -> bool:
 func _test_full_and_replaced(t) -> bool:
 	var server = _server(t, 24762)
 	var clients := []
-	for i in 4:
+	for i in 4:  # one at a time: slots follow auth order
 		clients.append(_client(24762, "C%d" % i, "c%d" % i))
-	var all_in := func(): return server.connected_count() == 4 and clients.all(func(c): return c.status == "connected")
-	t.check(_pump([server] + clients, all_in), "session: four captains connect")
+		_connect_all(t, server, clients)
 	t.check(clients.map(func(c): return c.slot) == [0, 1, 2, 3], "session: slots 0-3 in order")
 	var extra = _client(24762, "Extra", "c9")
 	t.check(_pump([server, extra] + clients, func(): return not _rec(extra)["auth"].is_empty()), "session: fifth refused")
@@ -286,6 +285,7 @@ func _ticks_ordered(events: Array) -> bool:
 func _test_battle_join_and_harbor(t) -> bool:
 	var server = _server(t, 24764)
 	var a = _client(24764, "Anne", "anne")
+	_connect_all(t, server, [a])  # one at a time: slots follow auth order (A 0, B 1)
 	var b = _client(24764, "Bonny", "bonny")
 	var clients := [a, b]
 	var all := [server, a, b]
@@ -743,7 +743,8 @@ func _test_replaced_reclaims(t) -> bool:
 	t.check(_rec(a2)["joined"][0]["ship_id"] == FIRST, "session: A2 reclaims ship FIRST")
 	t.check(battle.pending_ops.map(func(op): return op["op"]) == ["linger", "reclaim"], "session: linger + reclaim in one step")
 	_ticks(server, [b, a2], 1)
-	t.check(_pump(all, func(): return _has_event(b, "captain_info", FIRST)), "session: B gets captain_info")
+	var info_after := func(): return _rec(b)["events"].slice(before).any(func(e): return e["type"] == "captain_info" and e.get("ship_id") == FIRST)
+	t.check(_pump(all, info_after), "session: B gets the new captain_info")
 	var fresh: Array = _rec(b)["events"].slice(before).filter(func(e): return e.get("ship_id") == FIRST)
 	var kinds := fresh.map(func(e): return e["type"])
 	t.check(kinds == ["ship_lingering", "ship_reclaimed", "captain_info"], "session: B's events in order (%s)" % [kinds])
