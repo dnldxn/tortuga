@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Interactive 3D concept gallery for Tortuga's sloop, brig, and frigate ship assets.">
+    <meta name="description" content="Explore Tortuga's Sloop, Brig, Frigate, and Galleon. Rotate, zoom, fire cannons, and download the ship models.">
     <meta name="theme-color" content="#062c38">
     <title>Tortuga Shipwright's Table</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23052a36'/%3E%3Cpath d='M9 42c10-6 36-6 46 0-5 11-13 16-23 16S14 53 9 42Z' fill='%23be6a43'/%3E%3Cpath d='M31 9v34M31 12 12 35h19Z' fill='%23f2dfb5' stroke='%23f2dfb5' stroke-width='3'/%3E%3C/svg%3E">
@@ -16,74 +16,60 @@
   <body>
     <main class="app-shell">
       <header class="masthead">
-        <div>
-          <p class="eyebrow">TORTUGA · MASTER SHIPWRIGHT</p>
-          <h1>Shipwright's table</h1>
-        </div>
-        <div class="edition-mark" aria-label="Three-dimensional detail pass two">
-          <span>3D DETAIL PASS</span>
-          <strong>02</strong>
-        </div>
+        <div><p class="eyebrow">TORTUGA · MASTER SHIPWRIGHT</p><h1>Shipwright's table</h1></div>
+        <p class="edition-mark">FOUR SHIPS<br><span>ONE OPEN SEA</span></p>
       </header>
-
       <section class="workbench" aria-labelledby="gallery-title">
-        <h2 id="gallery-title" class="sr-only">Interactive 3D ship concepts</h2>
-
-        <div class="controls" aria-label="Ship preview controls">
-          <div class="control-block class-control">
-            <span class="control-label">Vessel class</span>
-            <div class="tabs" role="tablist" aria-label="Vessel class">
-              <button class="tab is-active" id="tab-sloop" role="tab" aria-selected="true" aria-controls="gallery" data-type="sloop">Sloop</button>
-              <button class="tab" id="tab-brig" role="tab" aria-selected="false" aria-controls="gallery" data-type="brig">Brig</button>
-              <button class="tab" id="tab-frigate" role="tab" aria-selected="false" aria-controls="gallery" data-type="frigate">Frigate</button>
+        <h2 id="gallery-title" class="sr-only">Interactive 3D ships</h2>
+        <div class="tabs" role="tablist" aria-label="Vessel class">
+          <button class="tab is-active" id="tab-sloop" role="tab" aria-selected="true" aria-controls="gallery" data-type="sloop">Sloop</button>
+          <button class="tab" id="tab-brig" role="tab" aria-selected="false" aria-controls="gallery" tabindex="-1" data-type="brig">Brig</button>
+          <button class="tab" id="tab-frigate" role="tab" aria-selected="false" aria-controls="gallery" tabindex="-1" data-type="frigate">Frigate</button>
+          <button class="tab" id="tab-galleon" role="tab" aria-selected="false" aria-controls="gallery" tabindex="-1" data-type="galleon">Galleon</button>
+        </div>
+        <div class="gallery-heading">
+          <div><p id="class-kicker" class="eyebrow">SLOOP · QUICK · ONE MAST</p><h3 id="class-name">Sunfish Runner</h3><p id="gun-count">8 cannons · 4 per side</p></div>
+          <p id="class-note">Honey-oak hull, navy trim, and a compact open deck under a gaff sail and jib.</p>
+        </div>
+        <div class="gallery" id="gallery" role="tabpanel" aria-labelledby="tab-sloop">
+          <div class="sea-window">
+            <div class="ship-stage">
+              <canvas class="model-canvas" tabindex="0" role="img" aria-label="Three-dimensional Sloop, Sunfish Runner" aria-describedby="viewer-help"></canvas>
+              <p class="webgl-fallback" hidden>WebGL is needed to display this 3D ship.</p>
+            </div>
+            <span class="model-mark">PROCEDURAL 3D · TRUE TO SCALE</span>
+            <span class="bearing-mark">HEADING · <b class="card-heading">000°</b></span>
+          </div>
+          <div class="viewer-toolbar">
+            <p id="viewer-help">Drag to rotate · scroll or pinch to zoom<br><span>Keyboard: arrows rotate · + / − zoom · R resets</span></p>
+            <div class="viewer-actions" aria-label="View controls">
+              <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+              <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+              <button id="reset-view" type="button">Reset view</button>
+            </div>
+            <div class="asset-actions">
+              <button class="fire-button" id="fire-cannons" type="button">Fire cannons</button>
+              <button id="model-download" type="button">Download GLB ↓</button>
             </div>
           </div>
-
+        </div>
+        <div class="controls" aria-label="Ship preview controls">
           <label class="control-block range-control" for="wind-range">
             <span class="control-line"><span class="control-label">Wind bearing</span><output id="wind-output" for="wind-range">045° · NE</output></span>
-            <span class="range-row">
-              <span class="compass" aria-hidden="true"><i id="wind-needle"></i><b>N</b></span>
-              <input id="wind-range" type="range" min="0" max="359" value="45" aria-label="Wind bearing in degrees">
-            </span>
+            <span class="range-row"><span class="compass" aria-hidden="true"><i></i><b>N</b></span><input id="wind-range" type="range" min="0" max="359" value="45" aria-label="Wind bearing in degrees"></span>
           </label>
-
           <label class="control-block range-control" for="heading-range">
-            <span class="control-line"><span class="control-label">Ship turn</span><output id="heading-output" for="heading-range">000° · BROADSIDE</output></span>
-            <span class="range-row heading-row">
-              <span class="turn-icon" aria-hidden="true">↻</span>
-              <input id="heading-range" type="range" min="0" max="359" value="0" aria-label="Horizontal ship rotation in degrees">
-            </span>
+            <span class="control-line"><span class="control-label">Ship heading</span><output id="heading-output" for="heading-range">000°</output></span>
+            <span class="range-row"><span class="turn-icon" aria-hidden="true">↻</span><input id="heading-range" type="range" min="0" max="359" value="0" aria-label="Ship heading in degrees"></span>
           </label>
-
           <label class="control-block range-control" for="speed-range">
             <span class="control-line"><span class="control-label">Ship speed</span><output id="speed-output" for="speed-range">38%</output></span>
-            <span class="range-row speed-row">
-              <span class="knot-icon" aria-hidden="true">≈</span>
-              <input id="speed-range" type="range" min="0" max="100" value="38" aria-label="Ship speed percentage">
-            </span>
+            <span class="range-row"><span class="turn-icon" aria-hidden="true">≈</span><input id="speed-range" type="range" min="0" max="100" value="38" aria-label="Ship speed percentage"></span>
           </label>
-
-          <button class="motion-toggle" id="motion-toggle" type="button" aria-pressed="true">
-            <span class="motion-dot" aria-hidden="true"></span>
-            Motion on
-          </button>
+          <button class="motion-toggle" id="motion-toggle" type="button" aria-pressed="true"><span class="motion-dot" aria-hidden="true"></span><span class="motion-label">Motion on</span></button>
         </div>
-
-        <div class="gallery-heading">
-          <div>
-            <p id="class-kicker" class="eyebrow">QUICK · ONE MAST · 4 GUNS PER SIDE</p>
-            <h3 id="class-name">Sloop studies</h3>
-          </div>
-          <p id="class-note">Three agile silhouettes for scouting, smuggling, and sharp turns.</p>
-        </div>
-
-        <div class="gallery" id="gallery" role="tabpanel" aria-labelledby="tab-sloop" tabindex="0"></div>
       </section>
-
-      <footer>
-        <p>Fixed 30° camera · actual 3D geometry · downloadable GLB assets.</p>
-        <p id="status" aria-live="polite">Loading three sloop models.</p>
-      </footer>
+      <footer><p>Built for Tortuga · ship geometry and rigging included in each GLB.</p><p id="status" role="status" aria-live="polite">Loading Sunfish Runner.</p></footer>
     </main>
   </body>
 </html>

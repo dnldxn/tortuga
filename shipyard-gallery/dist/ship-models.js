@@ -2,9 +2,9 @@ import * as THREE from "three";
 
 export const vesselCatalog = {
   sloop: {
-    name: "Sloop studies",
-    kicker: "QUICK · ONE MAST · 4–6 GUNS",
-    note: "Three nimble one-masters, now built as complete turntable-ready 3D models.",
+    name: "Sloop",
+    kicker: "QUICK · ONE MAST",
+    note: "Honey-oak hull, navy trim, and a compact open deck under a gaff sail and jib.",
     fitHeight: 7.2,
     ships: [
       {
@@ -36,9 +36,9 @@ export const vesselCatalog = {
     ]
   },
   brig: {
-    name: "Brig studies",
-    kicker: "BALANCED · TWO MASTS · 8–12 GUNS",
-    note: "Two-mast workhorses with deep hulls, independently trimming square rigs, and broad decks.",
+    name: "Brig",
+    kicker: "BALANCED · TWO MASTS",
+    note: "Deep walnut hull, royal blue bands, square sails, and brass-fitted stern cabin.",
     fitHeight: 9.1,
     ships: [
       {
@@ -74,9 +74,9 @@ export const vesselCatalog = {
     ]
   },
   frigate: {
-    name: "Frigate studies",
-    kicker: "HEAVY · THREE MASTS · TWO GUN DECKS",
-    note: "Commanding three-masters with raised stern galleries and fully modeled port and starboard batteries.",
+    name: "Frigate",
+    kicker: "HEAVY · THREE MASTS",
+    note: "Long blackened oak hull, cream gunport band, and a substantial stern gallery.",
     fitHeight: 10.8,
     ships: [
       {
@@ -113,6 +113,18 @@ export const vesselCatalog = {
         palette: { hull: 0x252b2b, deck: 0x625243, trim: 0x6fa79c, accent: 0x8b7b50, iron: 0x151a1b, sail: 0xd7d0ba, rope: 0x4d463e }
       }
     ]
+  },
+  galleon: {
+    name: "Galleon",
+    kicker: "COMMANDING · THREE MASTS · TWO GUN DECKS",
+    note: "Broad chestnut hull, crimson and gold, raised forecastle, and a stepped sterncastle beneath a lateen mizzen.",
+    fitHeight: 14,
+    ships: [{
+      id: "galleon", name: "Galleon", role: "Grand two-deck treasure ship",
+      scale: { length: 1, beam: 1, depth: 1 }, guns: 8, upperGuns: 8,
+      cabin: 1.5, ornate: true,
+      palette: { hull: 0x743e28, deck: 0xb7814f, trim: 0x9f2634, accent: 0xd9b35c, iron: 0x202124, sail: 0xf0e0bd, rope: 0x71553b }
+    }]
   }
 };
 
@@ -193,7 +205,8 @@ function dimensionsFor(type, variant) {
   const bases = {
     sloop: { length: 8.2, beam: 1.18, depth: 1.08, deck: 0.58, mast: 4.95 },
     brig: { length: 10.4, beam: 1.48, depth: 1.35, deck: 0.76, mast: 6.45 },
-    frigate: { length: 12.1, beam: 1.67, depth: 1.55, deck: 0.93, mast: 7.15 }
+    frigate: { length: 12.1, beam: 1.67, depth: 1.55, deck: 0.93, mast: 7.15 },
+    galleon: { length: 12.1 * 1.03 * 1.3, beam: 1.67 * 1.35, depth: 1.55 * 1.08 * 1.3, deck: 1.22, mast: 7.15 * 1.25 / 1.04 }
   };
   const base = bases[type];
   return {
@@ -213,7 +226,7 @@ function buildStations(dims, type, variant) {
   return positions.map((position, index) => {
     const sternFullness = variant.ornate && index < 2 ? 1.08 : 1;
     const bowSharpness = variant.id === "red-wake" && index > 5 ? 0.8 : 1;
-    const typeFullness = type === "frigate" && index < 4 ? 1.04 : 1;
+    const typeFullness = (type === "frigate" || type === "galleon") && index < 4 ? 1.04 : 1;
     const deckY = dims.deck + sheer[index] * (type === "frigate" ? 0.88 : 0.65);
     return {
       x: position * dims.length,
@@ -249,7 +262,7 @@ function hullGeometry(stations) {
       const b = (stationIndex + 1) * ringSize + ringIndex;
       const c = (stationIndex + 1) * ringSize + nextRing;
       const d = stationIndex * ringSize + nextRing;
-      indices.push(a, b, d, b, c, d);
+      indices.push(a, d, b, b, d, c);
     }
   }
   [0, stations.length - 1].forEach((stationIndex, capIndex) => {
@@ -259,8 +272,8 @@ function hullGeometry(stations) {
     for (let ringIndex = 0; ringIndex < ringSize; ringIndex += 1) {
       const a = stationIndex * ringSize + ringIndex;
       const b = stationIndex * ringSize + ((ringIndex + 1) % ringSize);
-      if (capIndex === 0) indices.push(centerIndex, b, a);
-      else indices.push(centerIndex, a, b);
+      if (capIndex === 0) indices.push(centerIndex, a, b);
+      else indices.push(centerIndex, b, a);
     }
   });
   const geometry = new THREE.BufferGeometry();
@@ -285,7 +298,7 @@ function deckGeometry(stations) {
       const b = (stationIndex + 1) * 3 + strip;
       const c = (stationIndex + 1) * 3 + strip + 1;
       const d = stationIndex * 3 + strip + 1;
-      indices.push(a, d, b, b, d, c);
+      indices.push(a, b, d, b, c, d);
     }
   }
   const geometry = new THREE.BufferGeometry();
@@ -631,6 +644,29 @@ function addHullDetails(ship, stations, dims, type, variant, materials) {
   ship.add(deck);
 
   [-1, 1].forEach((side) => {
+    if (type !== "sloop") {
+      const bandLevels = type === "galleon" ? [[0.11, 0.26], [0.41, 0.56]] : type === "frigate" ? [[0.23, 0.46]] : [[0.21, 0.4]];
+      bandLevels.forEach(([upper, lower]) => {
+        const positions = [];
+        const indices = [];
+        stations.forEach((station, index) => {
+          const height = station.deckY - station.keelY;
+          for (const fraction of [upper, lower]) positions.push(station.x, station.deckY - height * fraction, side * (sideWidthAtDepth(station, fraction) + 0.018));
+          if (index < stations.length - 1) {
+            const a = index * 2;
+            if (side > 0) indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+            else indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+          }
+        });
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+        const band = new THREE.Mesh(geometry, materials.trim);
+        band.name = `${side > 0 ? "starboard" : "port"} painted gun deck band`;
+        ship.add(band);
+      });
+    }
     const gunwalePoints = stations.slice(0, -1).map((station) => new THREE.Vector3(station.x, station.deckY + 0.1, side * station.width * 0.9));
     const stripePoints = stations.slice(0, -1).map((station) => {
       const height = station.deckY - station.keelY;
@@ -759,15 +795,71 @@ function addCabin(ship, stations, dims, type, variant, materials) {
   }
 }
 
-function addCannons(ship, stations, dims, type, variant, materials, representative) {
-  const rows = [{ count: representative ? { sloop: 4, brig: 6, frigate: 8 }[type] : variant.guns, yOffset: type === "frigate" ? -0.62 : -0.43 }];
-  if (!representative && variant.upperGuns) rows.push({ count: variant.upperGuns, yOffset: -0.04 });
+function addCastles(ship, stations, dims, variant, materials) {
+  const sternX = -dims.length * 0.37;
+  const sternY = deckAt(stations, -dims.length * 0.34) + variant.cabin + 0.14;
+  const sternWidth = widthAt(stations, -dims.length * 0.34) * 1.14;
+  const sternLength = dims.length * 0.13;
+  const foreX = dims.length * 0.35;
+  const foreY = deckAt(stations, foreX);
+  const foreWidth = widthAt(stations, foreX) * 1.4;
+  const foreLength = dims.length * 0.16;
+  for (const [name, x, y, length, width, height] of [
+    ["stepped upper sterncastle", sternX, sternY, sternLength, sternWidth, 0.58],
+    ["raised forecastle", foreX, foreY, foreLength, foreWidth, 0.62]
+  ]) {
+    const castle = meshWithEdges(new THREE.BoxGeometry(length, height, width), materials.hull);
+    castle.name = name;
+    castle.position.set(x, y + height / 2, 0);
+    ship.add(castle);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(length * 1.03, 0.09, width * 1.03), materials.deck);
+    top.name = `${name} deck`;
+    top.position.set(x, y + height, 0);
+    ship.add(top);
+    [-1, 1].forEach((side) => {
+      const z = side * width * 0.51;
+      const railY = y + height + 0.3;
+      const rail = cylinderBetween(new THREE.Vector3(x - length / 2, railY, z), new THREE.Vector3(x + length / 2, railY, z), 0.035, materials.accent);
+      rail.name = "castle balustrade";
+      ship.add(rail);
+      for (let index = 0; index <= 5; index += 1) {
+        const postX = x - length / 2 + index * length / 5;
+        ship.add(cylinderBetween(new THREE.Vector3(postX, y + height, z), new THREE.Vector3(postX, railY, z), 0.025, materials.accent));
+      }
+      if (name.includes("stern")) for (let index = 0; index < 3; index += 1) {
+        const window = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.25, 0.035), materials.window);
+        window.name = "upper sterncastle window";
+        window.position.set(x - length * 0.3 + index * length * 0.3, y + height * 0.55, z);
+        ship.add(window);
+      }
+    });
+    const forward = x < 0 ? 1 : -1;
+    for (let index = 0; index < 5; index += 1) {
+      const stepHeight = (index + 1) * height / 5;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(0.18, stepHeight, 0.6), materials.deck);
+      step.name = "castle stair tread";
+      step.position.set(x + forward * (length / 2 + (5 - index) * 0.15), y + stepHeight / 2, 0);
+      ship.add(step);
+    }
+  }
+}
+
+function addCannons(ship, stations, dims, type, variant, materials, representative, cannons) {
+  const rows = [{ count: representative ? { sloop: 4, brig: 6, frigate: 8, galleon: 8 }[type] : variant.guns, yOffset: type === "galleon" ? -1.03 : type === "frigate" ? -0.62 : -0.43 }];
+  if (type === "galleon" || (!representative && variant.upperGuns)) rows.push({ count: variant.upperGuns, yOffset: type === "galleon" ? -0.4 : -0.04 });
   const frameSegments = [];
   rows.forEach((row, rowIndex) => {
     for (let index = 0; index < row.count; index += 1) {
       const x = THREE.MathUtils.lerp(dims.length * (representative ? 0.29 : -0.31), dims.length * (representative ? -0.31 : 0.29), row.count === 1 ? 0.5 : index / (row.count - 1));
-      const width = widthAt(stations, x);
       const y = deckAt(stations, x) + row.yOffset;
+      const leftIndex = Math.max(0, stations.findIndex((station) => station.x >= x) - 1);
+      const left = stations[leftIndex];
+      const right = stations[leftIndex + 1];
+      const t = (x - left.x) / (right.x - left.x);
+      const width = THREE.MathUtils.lerp(
+        sideWidthAtDepth(left, (left.deckY - y) / (left.deckY - left.keelY)),
+        sideWidthAtDepth(right, (right.deckY - y) / (right.deckY - right.keelY)), t
+      );
       [-1, 1].forEach((side) => {
         const portSize = representative ? 0.32 : rowIndex === 0 ? 0.24 : 0.2;
         const port = new THREE.Mesh(new THREE.BoxGeometry(portSize, portSize, 0.05), materials.port);
@@ -783,19 +875,28 @@ function addCannons(ship, stations, dims, type, variant, materials, representati
           [new THREE.Vector3(x - halfFrame, y + halfFrame, frameZ), new THREE.Vector3(x - halfFrame, y - halfFrame, frameZ)]
         );
         const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.07, rowIndex === 0 ? 0.42 : 0.34, 8), materials.iron);
-        barrel.rotation.x = Math.PI * 0.5;
+        barrel.rotation.x = side * Math.PI * 0.5;
         barrel.position.set(x, y, side * (width + (rowIndex === 0 ? 0.18 : 0.14)));
         barrel.name = "cannon barrel";
         ship.add(barrel);
-        if (representative) {
+        {
           const sideName = side > 0 ? "starboard" : "port";
           // Empty transforms survive batching; cylinder tips are +/- half its length.
           const muzzle = new THREE.Object3D();
-          muzzle.name = `Muzzle_${sideName}_${index}`;
-          muzzle.position.set(x, y, side * (width + 0.39));
+          muzzle.name = `Muzzle_${sideName}_${rowIndex * rows[0].count + index}`;
+          muzzle.position.set(x, y, barrel.position.z + side * barrel.geometry.parameters.height / 2);
+          muzzle.rotation.y = side < 0 ? Math.PI : 0;
           ship.add(muzzle);
+          cannons.push({ side: sideName, barrel, muzzle });
+          const opening = new THREE.Mesh(new THREE.CircleGeometry(0.037, 10), materials.port);
+          opening.position.copy(muzzle.position);
+          opening.position.z += side * 0.003;
+          opening.rotation.y = side < 0 ? Math.PI : 0;
+          opening.name = "dark cannon bore";
+          ship.add(opening);
           const collar = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.018, 4, 8), materials.accent);
-          collar.position.set(x, y, side * (width + 0.35));
+          collar.position.copy(muzzle.position);
+          collar.position.z -= side * 0.025;
           collar.name = "brass muzzle collar";
           ship.add(collar);
           const sill = new THREE.Mesh(new THREE.BoxGeometry(0.39, 0.075, 0.09), materials.accent);
@@ -1001,10 +1102,24 @@ function addSquareRig(ship, stations, dims, type, variant, materials, sailPivots
     ship.add(pivot);
     sailPivots.push(pivot);
 
-    const sailCount = type === "frigate" ? (mastIndex === 1 ? 3 : 2) : 2;
+    if (type === "galleon" && mastIndex === 0) {
+      pivot.name = "wind-trimming lateen mizzen";
+      pivot.userData.trimFactor = 0.65;
+      const aft = -dims.length * 0.14;
+      const fore = dims.length * 0.13;
+      const lateen = flatSail([[aft, height * 0.74], [fore, height * 0.89], [aft * 0.65, height * 0.24]], materials.sail, materials.sailEdge);
+      lateen.name = "triangular lateen mizzen sail";
+      pivot.add(lateen);
+      const yard = cylinderBetween(new THREE.Vector3(aft * 1.06, height * 0.73, 0), new THREE.Vector3(fore * 1.08, height * 0.9, 0), 0.055, materials.wood);
+      yard.name = "sloping lateen yard";
+      pivot.add(yard);
+      addLineSegments(lateen, [[new THREE.Vector3(aft * 0.76, height * 0.75, 0.027), new THREE.Vector3(aft * 0.57, height * 0.35, 0.027)], [new THREE.Vector3(0, height * 0.82, 0.027), new THREE.Vector3(aft * 0.48, height * 0.47, 0.027)]], materials.sailEdge, "lateen sail seams");
+      return;
+    }
+    const sailCount = type === "frigate" || type === "galleon" ? (mastIndex === 1 ? 3 : 2) : 2;
     for (let sailIndex = 0; sailIndex < sailCount; sailIndex += 1) {
       const normalized = sailIndex / Math.max(1, sailCount - 1);
-      const widthBase = type === "frigate" ? dims.beam * 2.65 : dims.beam * 2.5;
+      const widthBase = type === "frigate" || type === "galleon" ? dims.beam * 2.65 : dims.beam * 2.5;
       const width = widthBase * (1 - normalized * 0.34) * (mastIndex === 0 ? 0.88 : mastIndex === mastFractions.length - 1 ? 0.92 : 1);
       const sailHeight = height * (sailCount === 3 ? 0.2 : 0.245) * (1 - normalized * 0.15);
       const centerY = height * (sailCount === 3 ? 0.43 + sailIndex * 0.22 : 0.44 + sailIndex * 0.27);
@@ -1122,7 +1237,7 @@ function addFlag(ship, stations, dims, type, materials) {
   ship.add(flag);
 }
 
-export function createShipModel(type, variantIndex) {
+export function createShipModel(type, variantIndex = 0) {
   const classData = vesselCatalog[type];
   if (!classData) throw new Error(`Unknown vessel class: ${type}`);
   const variant = classData.ships[variantIndex];
@@ -1170,7 +1285,9 @@ export function createShipModel(type, variantIndex) {
   addSurfaceDetails(ship, stations, dims, type, variant, materials);
   addCabin(ship, stations, dims, type, variant, materials);
   addDeckFittings(ship, stations, dims, type, variant, materials);
-  addCannons(ship, stations, dims, type, variant, materials, variantIndex === 0);
+  const cannons = [];
+  addCannons(ship, stations, dims, type, variant, materials, variantIndex === 0, cannons);
+  if (type === "galleon") addCastles(ship, stations, dims, variant, materials);
   if (variantIndex === 0) {
     // Broader contrasting coamings keep the existing cargo hatch readable at game scale.
     ship.children.filter((child) => child.name === "grated cargo hatch").forEach((hatch) => {
@@ -1199,15 +1316,22 @@ export function createShipModel(type, variantIndex) {
     });
   }
 
+  const usedMaterials = new Set();
+  ship.traverse((part) => { if (part.material) usedMaterials.add(part.material); });
+  Object.values(materials).forEach((fill) => { if (!usedMaterials.has(fill)) fill.dispose(); });
   ship.updateMatrixWorld(true);
   const bounds = new THREE.Box3().setFromObject(ship);
-  return { object: ship, sailPivots, bounds, variant, fitHeight: classData.fitHeight };
+  return { object: ship, sailPivots, cannons, bounds, dimensions: dims, variant, fitHeight: classData.fitHeight };
 }
 
 export function disposeShip(object) {
+  const geometries = new Set();
+  const materials = new Set();
   object.traverse((child) => {
-    child.geometry?.dispose?.();
-    if (Array.isArray(child.material)) child.material.forEach((item) => item.dispose?.());
-    else child.material?.dispose?.();
+    if (child.geometry) geometries.add(child.geometry);
+    if (Array.isArray(child.material)) child.material.forEach((item) => materials.add(item));
+    else if (child.material) materials.add(child.material);
   });
+  geometries.forEach((geometry) => geometry.dispose());
+  materials.forEach((fill) => fill.dispose());
 }
