@@ -38,6 +38,7 @@ var _pending_end := false   # the connection went away during _mp.poll()
 var _end_reason := ""       # set by server_stopping / replaced
 var _polling := false
 var _close_requested := false  # disconnect_from() called during _mp.poll()
+var _last_snapshot_tick := -1   # newest snapshot tick emitted for the current battle
 var _stats := {"bytes_in": 0, "bytes_out": 0, "packets_in": 0, "packets_out": 0}
 
 
@@ -80,24 +81,45 @@ func connect_to(host: String, port: int, captain_name: String, password: String,
 	return OK
 
 
-func start_battle(_preset_id: String, _vessel_id: String) -> void:
-	pass  # Task 4
+func start_battle(preset_id: String, vessel_id: String) -> void:
+	_send({"t": "start_battle", "preset_id": preset_id, "vessel_id": vessel_id})
 
 
-func join_battle(_id: int, _vessel_id: String) -> void:
-	pass  # Task 4
+func join_battle(id: int, vessel_id: String) -> void:
+	_send({"t": "join_battle", "battle_id": id, "vessel_id": vessel_id})
 
 
 func leave_battle() -> void:
-	pass  # Task 4
+	_send({"t": "leave_battle"})
+	battle_id = 0
+	ship_id = 0
+	ship_active = false
 
 
-func send_action(_action: String) -> bool:
-	return false  # Task 4
+## Reliable; false (nothing sent) unless connected, in a battle with an active ship, and a known action.
+func send_action(action: String) -> bool:
+	if not _can_command() or not action in Protocol.ACTIONS:
+		return false
+	_send({"t": "action", "action": action})
+	actions_sent += 1
+	return true
 
 
-func set_steer(_turn: int) -> void:
-	pass  # Task 4
+## Call every tick; sends the held turn (unreliable ordered, channel 1) only while it can command.
+func set_steer(turn: int) -> void:
+	if _can_command():
+		_send({"t": "steer", "turn": clampi(turn, -1, 1)},
+			MultiplayerPeer.TRANSFER_MODE_UNRELIABLE_ORDERED, Protocol.CHANNEL_UNRELIABLE)
+
+
+func _can_command() -> bool:
+	return status == "connected" and battle_id != 0 and ship_active
+
+
+func _send(msg: Dictionary, mode := MultiplayerPeer.TRANSFER_MODE_RELIABLE, channel := Protocol.CHANNEL_RELIABLE) -> void:
+	if status != "connected" or _mp == null:
+		return
+	_mp.send_bytes(Protocol.encode_message(msg), 1, mode, channel)
 
 
 ## Graceful ENet close; emits nothing. From a signal handler inside poll() it waits for poll's end.
@@ -195,13 +217,47 @@ func _on_connection_gone() -> void:
 
 
 func _on_peer_packet(_peer: int, packet: PackedByteArray) -> void:
-	if packet.is_empty() or packet[0] != Protocol.KIND_MESSAGE:
-		return  # snapshots: Task 4
+	if packet.is_empty():
+		return
+	if packet[0] == Protocol.KIND_SNAPSHOT:
+		var snap := Protocol.decode_snapshot(packet)
+		# Only the current battle, only newer than the last one (snapshots are unreliable).
+		if not snap.is_empty() and battle_id != 0 and snap["battle_id"] == battle_id and snap["tick"] > _last_snapshot_tick:
+			_last_snapshot_tick = snap["tick"]
+			snapshot_received.emit(snap)
+		return
 	var msg := Protocol.decode_message(packet)
 	match msg.get("t", ""):
 		"harbor":
 			actions_applied = int(msg.get("actions_applied", 0))
 			harbor_changed.emit(msg)
+		"joined":
+			battle_id = int(msg.get("battle_id", 0))
+			ship_id = int(msg.get("ship_id", 0))
+			ship_active = true
+			_last_snapshot_tick = -1
+			joined.emit(msg)
+		"events":
+			if msg.get("events") is Array:
+				events_received.emit(int(msg.get("battle_id", 0)), msg["events"])
+		"outcome":
+			# The server sends only our own outcomes; one for a battle we already left (an
+			# abandoned ship after joining elsewhere) must not touch the current battle.
+			if int(msg.get("battle_id", 0)) == battle_id:
+				ship_active = false
+				if msg.get("outcome") == "escaped" or msg.get("outcome") == "abandoned":
+					battle_id = 0
+					ship_id = 0
+			outcome.emit(msg)
+		"battle_result":
+			var id := int(msg.get("battle_id", 0))
+			if id != 0 and id == battle_id:
+				battle_id = 0
+				ship_id = 0
+				ship_active = false
+				battle_result.emit(id, msg["result"] if msg.get("result") is Dictionary else {})
+		"refused":
+			refused.emit(str(msg.get("reason", "")))
 		"server_stopping":
 			_end_reason = "server_stopped"
 		"replaced":

@@ -1,13 +1,18 @@
 extends Node
 ## Authoritative session server (Phase 3 plan 02). Owns its own SceneMultiplayer + ENet host and
 ## polls itself, so it works outside the SceneTree. No RPCs: Protocol packets via send_bytes.
-## poll() receives, dispatches and flushes the harbor; advance_tick() steps battles (Task 4).
+## poll() receives, dispatches and flushes the harbor; advance_tick() steps every battle.
+## Every handler validates its fields; a failure replies {"t": "refused", "reason"} with no side
+## effects. A battle closes in the same advance_tick its result appears, so no op ever follows it.
 
 const Protocol := preload("res://net/protocol.gd")
 const Definitions := preload("res://sim/definitions.gd")
 const Battle := preload("res://net/battle.gd")
 
 const AUTH_TIMEOUT_S := 3.0
+const DT := 1.0 / 60.0
+## Events that change a harbor entry (captains listed) mark the harbor dirty.
+const MEMBERSHIP_EVENTS: Array[String] = ["captain_joined", "ship_lingering", "ship_reclaimed", "ship_abandoned", "ship_escaped"]
 
 var battles := {}       # battle_id -> Battle (ids from 1, never reused)
 var captains := {}      # peer_id -> captain record (reserved at auth OK, connected at peer_connected)
@@ -94,7 +99,32 @@ func poll() -> void:
 
 
 func advance_tick() -> void:
-	return  # battles arrive in Task 4
+	if not is_active() or connected_count() == 0:
+		return  # pause-when-empty: no steps, linger grace frozen
+	var now := Time.get_ticks_msec()
+	for id in _sorted(battles.keys()):
+		var battle = battles[id]
+		var commands := {}
+		for c in _subscribers(id):
+			if c.state == "in_battle" and battle.has_active_ship(c.captain_id) and not battle.is_lingering(c.captain_id):
+				var command := {"turn": float(Protocol.steer_turn(c.turn, c.steer_ms, now))}
+				if not c.actions.is_empty():  # FIFO: at most one action per tick
+					command[c.actions.pop_front()] = true
+					c.applied += 1
+				commands[battle.ship_of[c.captain_id]] = command
+		var outcomes: Array = battle.advance(DT, commands)
+		_send_events(battle)
+		for o in outcomes:
+			_on_outcome(battle, o)
+		if not battle.sim.result.is_empty():
+			_send_snapshot(battle)  # final state, then the shared result
+			_close_battle(battle)
+		elif battle.tick % Protocol.SNAPSHOT_EVERY_TICKS == 0:
+			_send_snapshot(battle)
+	_ticks += 1
+	if not battles.is_empty() and _ticks % Protocol.HARBOR_REFRESH_TICKS == 0:
+		_harbor_dirty = true
+	_flush_harbor()
 
 
 func connected_count() -> int:
@@ -222,12 +252,17 @@ func _on_peer_disconnected(peer: int) -> void:
 	_harbor_dirty = true
 
 
-## Back to the harbor: an active, non-lingering ship in its battle starts lingering.
+## Back to the harbor (leave_battle, disconnect, replace): an active, non-lingering ship in its
+## battle starts lingering. A spectator just leaves.
 func _detach(c: Dictionary) -> void:
 	if c.state == "in_battle" and battles.has(c.battle_id):
 		var battle = battles[c.battle_id]
 		if battle.has_active_ship(c.captain_id) and not battle.is_lingering(c.captain_id):
 			battle.linger(c.captain_id)
+	_to_harbor(c)
+
+
+func _to_harbor(c: Dictionary) -> void:
 	c.state = "harbor"
 	c.battle_id = 0
 	c.actions.clear()
@@ -246,9 +281,188 @@ func _on_peer_packet(peer: int, packet: PackedByteArray) -> void:
 		_dispatch(c, msg)
 
 
-## Request handlers arrive in Task 4; unknown types are ignored.
-func _dispatch(_c: Dictionary, _msg: Dictionary) -> void:
-	pass
+## Unknown types are ignored.
+func _dispatch(c: Dictionary, msg: Dictionary) -> void:
+	match msg["t"]:
+		"start_battle":
+			_on_start_battle(c, msg)
+		"join_battle":
+			_on_join_battle(c, msg)
+		"leave_battle":
+			_detach(c)
+			_harbor_dirty = true
+		"action":
+			_on_action(c, msg)
+		"steer":
+			_on_steer(c, msg)
+
+
+func _refuse(c: Dictionary, reason: String) -> void:
+	_send(c, {"t": "refused", "reason": reason})
+
+
+func _valid_vessel(vessel_id) -> bool:
+	return vessel_id is String and Definitions.VESSELS.has(vessel_id)
+
+
+func _on_start_battle(c: Dictionary, msg: Dictionary) -> void:
+	var preset_id = msg.get("preset_id")
+	var vessel_id = msg.get("vessel_id")
+	if not (preset_id is String and preset_id in Definitions.BATTLE_PRESETS) or not _valid_vessel(vessel_id):
+		_refuse(c, "bad_request")
+		return
+	if battles.size() >= Definitions.MAX_BATTLES:
+		_refuse(c, "battle_cap")  # before leaving anything
+		return
+	var id := _next_battle_id
+	_next_battle_id += 1
+	_leave_for_other(c, id)
+	var battle = Battle.new(id, preset_id)
+	battles[id] = battle
+	battle.add_captain(c.captain_id, c.name, c.slot, vessel_id)
+	_enter(c, battle)
+	_log("SRV battle start id=%d preset=%s by=%s" % [id, preset_id, c.name])
+
+
+func _on_join_battle(c: Dictionary, msg: Dictionary) -> void:
+	var id = msg.get("battle_id")
+	if not (id is int):
+		_refuse(c, "bad_request")
+		return
+	if not battles.has(id):
+		_refuse(c, "unknown_battle")
+		return
+	var battle = battles[id]
+	var cid: String = c.captain_id
+	if battle.barred.has(cid):
+		_refuse(c, "no_reentry")
+		return
+	if battle.ship_of.has(cid) and not battle.is_lingering(cid):
+		_refuse(c, "already_in_battle")  # not barred and not lingering: its ship is active and commanded
+		return
+	var kind := "join"
+	if battle.is_lingering(cid):
+		kind = "reclaim"
+		battle.reclaim(cid, c.name, c.slot)  # vessel ignored
+	elif not _valid_vessel(msg.get("vessel_id")):
+		_refuse(c, "bad_request")
+		return
+	else:
+		battle.add_captain(cid, c.name, c.slot, msg["vessel_id"])
+	_leave_for_other(c, id)
+	_enter(c, battle)
+	_log("SRV battle %s id=%d captain=%s ship=%d" % [kind, id, c.name, battle.ship_of[cid]])
+
+
+## The captain commands its ship in `battle` from now on; it gets `joined` with every captain name.
+func _enter(c: Dictionary, battle) -> void:
+	c.state = "in_battle"
+	c.battle_id = battle.battle_id
+	c.actions.clear()
+	c.turn = 0
+	var names := {}
+	for ship_id in battle.names:
+		names[ship_id] = battle.names[ship_id].duplicate()
+	_send(c, {"t": "joined", "battle_id": battle.battle_id, "ship_id": battle.ship_of[c.captain_id],
+		"preset_id": battle.preset_id, "captains": names})
+	_harbor_dirty = true
+
+
+## Abandons the captain's ship (current or lingering) in every other battle; a spectating
+## subscription simply ends when the caller moves the record to the kept battle.
+func _leave_for_other(c: Dictionary, keep_id: int) -> void:
+	for id in battles:
+		if id != keep_id and battles[id].has_active_ship(c.captain_id):
+			battles[id].abandon(c.captain_id)
+
+
+func _on_action(c: Dictionary, msg: Dictionary) -> void:
+	c.received += 1
+	var action = msg.get("action")
+	if not (action is String and action in Protocol.ACTIONS) or c.state != "in_battle" or not battles.has(c.battle_id):
+		return
+	var battle = battles[c.battle_id]
+	if battle.has_active_ship(c.captain_id) and not battle.is_lingering(c.captain_id) \
+			and c.actions.size() < Protocol.ACTION_QUEUE_MAX:
+		c.actions.append(action)
+
+
+func _on_steer(c: Dictionary, msg: Dictionary) -> void:
+	var turn = msg.get("turn")
+	if turn is int and turn >= -1 and turn <= 1:
+		c.turn = turn
+		c.steer_ms = Time.get_ticks_msec()
+
+
+# --- battle delivery -------------------------------------------------------------------------
+
+## Connected records watching battle `id` (commanding or spectating), by slot.
+func _subscribers(id: int) -> Array:
+	var out := []
+	for c in _by_slot(captains.values()):
+		if c.connected and c.battle_id == id and (c.state == "in_battle" or c.state == "spectating"):
+			out.append(c)
+	return out
+
+
+## This step's events in sim order, deep-copied and stamped with the battle tick. fire_rejected
+## goes only to its ship's owner; each captain_joined / ship_reclaimed is followed by captain_info.
+func _send_events(battle) -> void:
+	var events := []
+	for e in battle.sim.events:
+		var copy: Dictionary = e.duplicate(true)
+		copy["tick"] = battle.tick
+		events.append(copy)
+		if copy["type"] in MEMBERSHIP_EVENTS:
+			_harbor_dirty = true
+		if copy["type"] == "captain_joined" or copy["type"] == "ship_reclaimed":
+			var info: Dictionary = battle.names.get(copy["ship_id"], {"name": "", "slot": -1})
+			events.append({"type": "captain_info", "ship_id": copy["ship_id"], "name": info["name"],
+				"slot": info["slot"], "tick": battle.tick})
+	if events.is_empty():
+		return
+	for c in _subscribers(battle.battle_id):
+		var own: int = battle.ship_of.get(c.captain_id, -1)
+		var list := events.filter(func(e): return e["type"] != "fire_rejected" or e["ship_id"] == own)
+		if not list.is_empty():
+			_send(c, {"t": "events", "battle_id": battle.battle_id, "events": list})
+
+
+func _send_snapshot(battle) -> void:
+	var bytes := Protocol.encode_snapshot(battle.battle_id, battle.sim, battle.tick)
+	if bytes.is_empty():
+		return  # encode_snapshot already push_errored
+	for c in _subscribers(battle.battle_id):
+		_mp.send_bytes(bytes, c.peer, MultiplayerPeer.TRANSFER_MODE_UNRELIABLE, Protocol.CHANNEL_UNRELIABLE)
+		c.bytes_out += bytes.size()
+
+
+func _on_outcome(battle, o: Dictionary) -> void:
+	var c := captain_by_id(o.captain_id)
+	if not c.is_empty() and c.connected:
+		_send(c, {"t": "outcome", "battle_id": battle.battle_id, "ship_id": o.ship_id, "outcome": o.outcome,
+			"elapsed": o.elapsed})
+	var captain_name: String = battle.names.get(o.ship_id, {}).get("name", o.captain_id)
+	_log("SRV outcome battle=%d captain=%s ship=%d outcome=%s" % [battle.battle_id, captain_name, o.ship_id, o.outcome])
+	if not c.is_empty() and c.battle_id == battle.battle_id and (c.state == "in_battle" or c.state == "spectating"):
+		if o.outcome == "sunk" or o.outcome == "disabled":
+			c.state = "spectating"
+			c.actions.clear()
+		elif o.outcome == "escaped" or o.outcome == "abandoned":
+			_to_harbor(c)
+	_harbor_dirty = true
+
+
+## Sends the shared result to every subscriber, returns them to the harbor and drops the battle.
+func _close_battle(battle) -> void:
+	var result: Dictionary = battle.sim.result
+	for c in _subscribers(battle.battle_id):
+		_send(c, {"t": "battle_result", "battle_id": battle.battle_id, "result": result.duplicate(true)})
+		_to_harbor(c)
+	_log("SRV battle result id=%d outcome=%s elapsed=%.2f hash=%s" % [battle.battle_id, result.outcome,
+		result.elapsed, Protocol.result_hash(result)])
+	battles.erase(battle.battle_id)
+	_harbor_dirty = true
 
 
 func _send(c: Dictionary, msg: Dictionary) -> void:
