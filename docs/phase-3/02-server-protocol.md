@@ -112,13 +112,13 @@ run id, the Test step's three lines (`Guard rejection: OK`, `Tests: N checks, 0 
 
 | Value | Setting | Why |
 |---|---|---|
-| Port | `Protocol.DEFAULT_PORT` 24680 (`--port` / `TORTUGA_SERVER_PORT`); smoke 24690; session tests 24760-24775 | out of the way of common services |
+| Port | server: required, `--port N` or `TORTUGA_SERVER_PORT` (no default; exit 2 otherwise); `Protocol.DEFAULT_PORT` 24680 is the bot's default and the conventional server port; smoke 24690; session tests 24760-24775 | an explicit server port avoids a silent clash; the ranges keep tests, smoke and a real server apart |
 | Snapshot rate | every `SNAPSHOT_EVERY_TICKS` = 3 ticks (20 Hz); sim steps at 60 Hz | spec section 2 |
 | Steering staleness | `STEER_STALE_MS` 500 | a silent steerer goes neutral quickly; the drop itself comes later |
-| Harbor refresh | `HARBOR_REFRESH_TICKS` 60 (also on any membership change) | |
+| Harbor refresh | `HARBOR_REFRESH_TICKS` 60 (also on any membership change) | keeps the harbor listing (elapsed time, lingering state) fresh without a message every tick |
 | Peers | `MAX_PEERS` 8 against `MAX_CAPTAINS` 4 | room to refuse or replace without ENet rejecting the socket |
 | Timeouts | `TIMEOUT_LIMIT` 32, `TIMEOUT_MIN_MS` 2000, `TIMEOUT_MAX_MS` 4000; client connect 5000 ms; server auth 3 s | silent peer gone in < 5 s |
-| Limits | `NAME_MAX` 24, `CAPTAIN_ID_MAX` 64, `ACTION_QUEUE_MAX` 64 | |
+| Limits | `NAME_MAX` 24, `CAPTAIN_ID_MAX` 64, `ACTION_QUEUE_MAX` 64 | bound untrusted client input: names and ids stay short, and a flood of reliable actions cannot grow a captain's queue without limit |
 | Server frame rate | `Engine.max_fps = 60` in `server_main`/`bot_main` | sends queued in physics are flushed by the same frame's poll |
 | ENet throttle / bandwidth | Godot's defaults (no `throttle_configure`, no bandwidth limit) | tuning belongs to Plan 05 with real networks; the hook is marked in `session_server.gd` |
 | Stop-file check | every 500 ms; `stop()` waits up to 1000 ms | |

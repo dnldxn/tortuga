@@ -38,7 +38,7 @@ bash game/tests/run_settings_checks.sh --self-test-failure                # must
 "$GODOT" --headless --path game --quit-after 30                           # smoke-run the real main scene (reads user://settings.cfg; the XDG exports on Linux, HOME="$P/home" on macOS, keep it off the real profile)
 "$GODOT" --path game --resolution 1280x720                                # play (needs a display)
 bash tools/build_release.sh 0.N build/phase-2/release   # local build of all release assets
-"$GODOT" --headless --path game -- --server --password SECRET [--port 24680] [--stop-file PATH]   # dedicated server (env TORTUGA_SERVER_PASSWORD / TORTUGA_SERVER_PORT; macOS: prefix HOME="$P/home"); stop = touch the stop file (exit 0), exit 2 on bad options
+"$GODOT" --headless --path game -- --server --port 24680 --password SECRET [--stop-file PATH]   # dedicated server; port and password are required (CLI, else env TORTUGA_SERVER_PORT / TORTUGA_SERVER_PASSWORD; no default port; macOS: prefix HOME="$P/home"); stop = touch the stop file (exit 0); exit 2 on bad options, 1 if it cannot listen
 "$GODOT" --headless --path game -- --bot --host H --port P --password SECRET [--name N --captain-id ID --preset duel_sloop --vessel sloop --join --loop --idle --seconds S]   # scriptable client; one "BOT summary" line, exit 0 / 1
 bash game/tests/run_server_smoke.sh                                       # real --server + 2 --bot processes on port 24690 (SMOKE_PORT); prints "Server smoke: OK"; needs absolute GODOT; CI runs it after Test
 ```
