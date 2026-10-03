@@ -74,17 +74,14 @@ func run(t) -> bool:
 		view.sync(main.sim)
 		t.check(overlay.get("reefed") and overlay.get("sail_fraction") == 1.0, "reefed intact sail has no torn-sail state")
 	main.start_encounter("two_sloops", "sloop")
-	t.check(hud.panels[1].get_combined_minimum_size().y <= 144.0, "two enemy rows fit reserved top HUD height")
-	t.check(not hud.panels[2].get_global_rect().intersects(hud.panels[3].get_global_rect())
-		and not hud.panels[3].get_global_rect().intersects(hud.panels[4].get_global_rect()),
-		"player tracks and side cards occupy separate bottom regions")
-	var port_pips: Array = hud.gun_bars["port"]
-	t.check(port_pips[0].get_child_count() > 0 and port_pips[0].get_child(0) is Label
-		and port_pips[0].get_child(0).text == "●", "loaded gun uses filled pip")
+	t.check(hud.roster_cards.keys() == [1, 2, 3], "top roster order is human then stable enemies")
+	var ready: Dictionary = view.readiness_geometry(main.sim, main.sim.ships[1]["position"], screen)
+	t.check(ready.port.dots.size() == 4 and ready.port.dots[0].ready, "sloop has filled loaded readiness dots")
 	main.sim.ships[1]["weapons"]["port"]["loads"] = [0.5, 0.0, 1.0, 1.0]
 	hud.refresh(main.sim)
-	t.check(port_pips[0].get_child_count() > 0 and port_pips[0].get_child(0).text == "◑"
-		and port_pips[1].get_child(0).text == "○", "partially reloading and empty guns use outlined pips")
+	ready = view.readiness_geometry(main.sim, main.sim.ships[1]["position"], screen)
+	t.check(not ready.port.dots[0].ready and not ready.port.dots[1].ready and ready.port.count == "2/4",
+		"partial and empty guns are both reloading; count uses fire readiness")
 	main.sim.ships[1]["weapons"]["port"]["ammo"] = "chain"
 	main.sim.ships[1]["weapons"]["port"]["loads"].fill(0.0)
 	hud.refresh(main.sim)
@@ -103,11 +100,11 @@ func run(t) -> bool:
 	main._input(_key(KEY_E, false))
 	main.advance_tick()
 	t.check(main.arena_view._cues.filter(func(c): return c["type"] == "shot").size() == 4 and main.sim.events.filter(func(e): return e["type"] == "shot").size() == 4, "fixed tick passes each successful gun event once to existing muzzle cues")
-	t.check(main.combat_audio.dispatch_counts["cannon"] == 1,
-		"controller sends one cannon for one successful four-gun volley")
+	t.check(main.combat_audio.dispatch_counts["cannon"] == 4,
+		"controller sends four cannon sounds for four successful guns")
 	main.advance_tick()
 	t.check(main.arena_view._cues.filter(func(c): return c["type"] == "shot").size() == 4, "next tick does not consume old sim events again")
-	t.check(main.combat_audio.dispatch_counts["cannon"] == 1,
+	t.check(main.combat_audio.dispatch_counts["cannon"] == 4,
 		"controller does not replay old volleys on the next tick")
 	main.start_encounter("two_sloops", "sloop")
 	var center: Vector2 = main.sim.ships[1]["position"]
@@ -196,7 +193,7 @@ func run(t) -> bool:
 	for i in 100:
 		impacts.append({"type": "hit", "projectile_id": i, "target_id": 2, "position": Vector2.ZERO, "track": "hull", "damage": 8.0, "ammo": "round"})
 	view.consume_events(impacts)
-	t.check(view._cues.size() <= 48, "impact cosmetics bounded to 48 records")
+	t.check(view._cues.size() <= 256, "impact cosmetics bounded to 256 records")
 	var total: Array = view._cues.filter(func(c): return c["type"] == "damage" and c["target_id"] == 2 and c["track"] == "hull")
 	t.check(total.size() == 1 and total[0]["damage"] == 800.0 and not total[0]["settled"],
 		"100 simultaneous hits keep the actual unsettled damage total under cosmetic cap")
@@ -230,13 +227,13 @@ func _test_audio(t, main, p) -> void:
 	for bus in ["Master", "Effects", "Ambient"]:
 		t.check(AudioServer.get_bus_index(bus) >= 0, "audio bus %s exists" % bus)
 	var groups: Dictionary = audio.effects
-	t.check(groups["cannon"].size() == 3 and groups["impact"].size() == 2
-		and groups["splash"].size() == 1 and audio.get_child_count() == 7,
-		"six bounded effect voices and one sea voice")
+	t.check(groups["cannon"].size() == 64 and groups["impact"].size() == 2
+		and groups["splash"].size() == 1 and audio.get_child_count() == 68,
+		"64 cannon voices retain overlapping loads, plus impacts/splash/sea")
 	for kind in groups:
 		for player in groups[kind]:
 			t.check(player.bus == &"Effects" and player.max_polyphony == 1
-				and player.volume_db == -18.0 and player.stream.get_length() > 0,
+				and (player.volume_db <= -40.0 and player.volume_db >= -45.0 if kind == "cannon" else player.volume_db == -18.0) and player.stream.get_length() > 0,
 				"%s player routes to Effects" % kind)
 	t.check(audio.ambient.bus == &"Ambient" and audio.ambient.volume_db == -20.0
 		and audio.ambient.stream.loop_mode == AudioStreamWAV.LOOP_FORWARD
@@ -251,17 +248,17 @@ func _test_audio(t, main, p) -> void:
 	for i in 8:
 		shots.append({"type": "shot", "ship_id": 1, "side": "port", "position": Vector2.ZERO})
 	audio.consume(p.normalize_events(shots))
-	t.check(audio.dispatch_counts["cannon"] - base["cannon"] == 1, "eight guns dispatch one cannon")
+	t.check(audio.dispatch_counts["cannon"] - base["cannon"] == 8, "eight guns dispatch eight cannon reports")
 	audio.consume(p.normalize_events(shots + [{"type": "shot", "ship_id": 1, "side": "starboard", "position": Vector2.ZERO}]))
-	t.check(audio.dispatch_counts["cannon"] - base["cannon"] == 3, "separate ticks and sides dispatch separate volleys")
+	t.check(audio.dispatch_counts["cannon"] - base["cannon"] == 17, "separate ticks and sides dispatch each shot")
 	audio.consume([{"type": "empty", "ship_id": 1, "side": "port"}])
-	t.check(audio.dispatch_counts["cannon"] - base["cannon"] == 3, "empty fire is silent")
+	t.check(audio.dispatch_counts["cannon"] - base["cannon"] == 17, "empty fire is silent")
 	var many_volleys := []
 	for i in 20:
 		many_volleys.append({"type": "volley", "ship_id": i + 1, "side": "port"})
 	audio.consume(many_volleys)
-	t.check(audio.dispatch_counts["cannon"] - base["cannon"] == 3,
-		"busy cannon slots drop newest volleys without a playback queue")
+	t.check(audio.dispatch_counts["cannon"] - base["cannon"] == 17,
+		"normalized volley events never duplicate cannon sounds")
 	var hit := {"type": "hit", "target_id": 2, "track": "hull"}
 	audio.consume([hit, hit, {"type": "hit", "target_id": 3, "track": "hull"}])
 	t.check(audio.dispatch_counts["impact"] - base["impact"] == 2, "same target/track hits within window share impact")
@@ -296,7 +293,7 @@ func _test_audio(t, main, p) -> void:
 	main.sim.result = {"outcome": "victory", "elapsed": 1.0,
 		"defeated": [{"ship_id": 2, "reason": "sunk", "disabled_by": []}]}
 	main._enter_mode("result")
-	t.check(not audio.ambient.playing and audio.hit_groups.is_empty(), "result clears sea and pending sounds")
+	t.check(not audio.ambient.playing and audio.hit_groups.is_empty(), "result stops sea and clears grouping while sounds finish")
 	var original_gain: Dictionary = main.settings.values.duplicate(true)
 	var changed_gain: Dictionary = original_gain.duplicate(true)
 	changed_gain["audio"]["ambient"] = 0.0

@@ -759,17 +759,17 @@ function addCabin(ship, stations, dims, type, variant, materials) {
   }
 }
 
-function addCannons(ship, stations, dims, type, variant, materials) {
-  const rows = [{ count: variant.guns, yOffset: type === "frigate" ? -0.62 : -0.43 }];
-  if (variant.upperGuns) rows.push({ count: variant.upperGuns, yOffset: -0.04 });
+function addCannons(ship, stations, dims, type, variant, materials, representative) {
+  const rows = [{ count: representative ? { sloop: 4, brig: 6, frigate: 8 }[type] : variant.guns, yOffset: type === "frigate" ? -0.62 : -0.43 }];
+  if (!representative && variant.upperGuns) rows.push({ count: variant.upperGuns, yOffset: -0.04 });
   const frameSegments = [];
   rows.forEach((row, rowIndex) => {
     for (let index = 0; index < row.count; index += 1) {
-      const x = THREE.MathUtils.lerp(-dims.length * 0.31, dims.length * 0.29, row.count === 1 ? 0.5 : index / (row.count - 1));
+      const x = THREE.MathUtils.lerp(dims.length * (representative ? 0.29 : -0.31), dims.length * (representative ? -0.31 : 0.29), row.count === 1 ? 0.5 : index / (row.count - 1));
       const width = widthAt(stations, x);
       const y = deckAt(stations, x) + row.yOffset;
       [-1, 1].forEach((side) => {
-        const portSize = rowIndex === 0 ? 0.24 : 0.2;
+        const portSize = representative ? 0.32 : rowIndex === 0 ? 0.24 : 0.2;
         const port = new THREE.Mesh(new THREE.BoxGeometry(portSize, portSize, 0.05), materials.port);
         port.position.set(x, y, side * width * 1.002);
         port.name = `${side > 0 ? "starboard" : "port"} gun port`;
@@ -787,6 +787,22 @@ function addCannons(ship, stations, dims, type, variant, materials) {
         barrel.position.set(x, y, side * (width + (rowIndex === 0 ? 0.18 : 0.14)));
         barrel.name = "cannon barrel";
         ship.add(barrel);
+        if (representative) {
+          const sideName = side > 0 ? "starboard" : "port";
+          // Empty transforms survive batching; cylinder tips are +/- half its length.
+          const muzzle = new THREE.Object3D();
+          muzzle.name = `Muzzle_${sideName}_${index}`;
+          muzzle.position.set(x, y, side * (width + 0.39));
+          ship.add(muzzle);
+          const collar = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.018, 4, 8), materials.accent);
+          collar.position.set(x, y, side * (width + 0.35));
+          collar.name = "brass muzzle collar";
+          ship.add(collar);
+          const sill = new THREE.Mesh(new THREE.BoxGeometry(0.39, 0.075, 0.09), materials.accent);
+          sill.position.set(x, y - 0.18, side * (width + 0.055));
+          sill.name = "reinforced gunport sill";
+          ship.add(sill);
+        }
         const lid = new THREE.Mesh(new THREE.BoxGeometry(portSize * 0.9, portSize * 0.5, 0.035), materials.hull);
         lid.position.set(x, y + portSize * 0.75, side * (width + 0.02));
         lid.rotation.x = side * 0.25;
@@ -796,6 +812,15 @@ function addCannons(ship, stations, dims, type, variant, materials) {
     }
   });
   addLineSegments(ship, frameSegments, materials.portFrame, "framed gun battery");
+  if (representative) {
+    [-1, 1].forEach((side) => {
+      const points = stations.filter((station) => station.x >= -dims.length * 0.38 && station.x <= dims.length * 0.36)
+        .map((station) => new THREE.Vector3(station.x, deckAt(stations, station.x) - 0.15, side * (widthAt(stations, station.x) + 0.055)));
+      const wale = tubeAlong(points, 0.055, materials.accent);
+      wale.name = "brass battery wale";
+      ship.add(wale);
+    });
+  }
 }
 
 function sailGrid(width, height, billow, fill, edgeFill) {
@@ -1145,7 +1170,17 @@ export function createShipModel(type, variantIndex) {
   addSurfaceDetails(ship, stations, dims, type, variant, materials);
   addCabin(ship, stations, dims, type, variant, materials);
   addDeckFittings(ship, stations, dims, type, variant, materials);
-  addCannons(ship, stations, dims, type, variant, materials);
+  addCannons(ship, stations, dims, type, variant, materials, variantIndex === 0);
+  if (variantIndex === 0) {
+    // Broader contrasting coamings keep the existing cargo hatch readable at game scale.
+    ship.children.filter((child) => child.name === "grated cargo hatch").forEach((hatch) => {
+      const rim = new THREE.Mesh(new THREE.BoxGeometry(type === "frigate" ? 1.18 : 0.95, 0.08, dims.beam * 0.8), materials.accent);
+      rim.position.copy(hatch.position);
+      rim.position.y -= 0.065;
+      rim.name = "brass hatch coaming";
+      ship.add(rim);
+    });
+  }
   addVariantDetails(ship, stations, dims, type, variant, materials);
   const sailPivots = [];
   if (type === "sloop") addSloopRig(ship, stations, dims, variant, materials, sailPivots);

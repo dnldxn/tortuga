@@ -43,6 +43,7 @@ var _chosen_preset := "practice"
 func _ready() -> void:
 	set_anchors_preset(PRESET_FULL_RECT)
 	var title := Label.new()
+	title.theme_type_variation = "NauticalHeading"
 	title.text = "Tortuga"
 	title.add_theme_font_size_override("font_size", 48)
 	var column := [title]
@@ -85,6 +86,7 @@ func _ready() -> void:
 	_mode_screen = _screen(column)
 
 	var heading := Label.new()
+	heading.theme_type_variation = "NauticalHeading"
 	heading.text = "Choose your vessel"
 	var group := ButtonGroup.new()
 	var vessel_column := [heading]
@@ -195,11 +197,17 @@ func _screen(children: Array) -> Control:
 	var center := CenterContainer.new()
 	center.set_anchors_preset(PRESET_FULL_RECT)
 	var panel := PanelContainer.new()
+	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(680, 640)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
+	box.add_theme_constant_override("separation", 8)
 	for child in children:
 		box.add_child(child)
-	panel.add_child(box)
+	box.size_flags_horizontal = SIZE_EXPAND_FILL
+	scroll.add_child(box)
+	panel.add_child(scroll)
 	center.add_child(panel)
 	add_child(center)
 	return center

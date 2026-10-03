@@ -21,6 +21,8 @@ const ENEMY_INK := Color(1.0, 0.62, 0.45)
 var main: Node
 var camera := Camera2D.new()
 var _ships := {}  # ship id -> Ship3DView
+var _projectile_visuals := {}
+var _result_effect_time := 0.0
 var _cues := []  # deep-copied events with ticks; never aliases sim.events
 var marker_layer: CanvasLayer
 var marker_canvas: Control
@@ -31,8 +33,9 @@ var _screen_size := Vector2.ZERO
 var _marker_edges := {}
 
 
-func advance_effects() -> void:
-	water.advance(main.DT, main.sim.wind_heading)
+func advance_effects(animate_water: bool = true) -> void:
+	if animate_water:
+		water.advance(main.DT, main.sim.wind_heading)
 	for cue in _cues:
 		cue["ticks"] -= 1
 	_cues = _cues.filter(func(cue): return cue["ticks"] > 0)
@@ -43,7 +46,17 @@ func advance_effects() -> void:
 
 
 func consume_events(events: Array) -> void:
+	# Resolve current muzzle markers once for shot batches, including ticks between frames.
+	if events.any(func(event): return event.get("type", "") == "shot"):
+		sync(main.sim)
 	for event in events:
+		if event["type"] == "shot":
+			var record: Dictionary = Presentation.arc_reference(main.sim, event)
+			record["origin"] = event["position"]
+			record["muzzle"] = _ships[event["ship_id"]].muzzle_position(event["side"], event["gun_index"]) if _ships.has(event["ship_id"]) else event["position"]
+			_projectile_visuals[event["projectile_id"]] = record
+		elif event["type"] in ["hit", "splash"]:
+			_projectile_visuals.erase(event["projectile_id"])
 		if event["type"] in ["shot", "hit", "splash", "defeated"]:
 			if event["type"] == "hit" and event.has("target_id"):
 				var joined := false
@@ -56,32 +69,23 @@ func consume_events(events: Array) -> void:
 					_add_cue({"type": "damage", "target_id": event["target_id"], "track": event["track"],
 						"damage": event["damage"], "position": event["position"], "ticks": 48, "settled": false})
 			var cue: Dictionary = event.duplicate(true)
-			cue["ticks"] = 16 if cue["type"] == "shot" else (60 if cue["type"] == "defeated" else 27)
+			if cue["type"] == "shot":
+				cue["position"] = _projectile_visuals.get(cue["projectile_id"], {}).get("muzzle", event["position"])
+			cue["ticks"] = Definitions.PRESENTATION.smoke_ticks if cue["type"] == "shot" else (60 if cue["type"] == "defeated" else 27)
 			_add_cue(cue)
 	queue_redraw()
 
 
 func _add_cue(cue: Dictionary) -> void:
-	if _cues.size() >= 48:
-		var evict := -1
-		for i in _cues.size():
-			if _cues[i]["type"] != "damage":
-				evict = i
-				break
-		if evict < 0:
-			for i in _cues.size():
-				if _cues[i]["settled"]:
-					evict = i
-					break
-		if evict < 0 and cue["type"] != "damage":
-			return
-		if evict < 0:
-			evict = 0  # At most nine active ship/track groups; unreachable outside synthetic floods.
-		_cues.remove_at(evict)
+	if _cues.size() >= Definitions.PRESENTATION.cue_capacity:
+		push_error("Combat cue capacity exceeded (unsupported synthetic event flood)")
+		return
 	_cues.append(cue)
 
 
 func reset_effects() -> void:
+	_projectile_visuals.clear()
+	_result_effect_time = 0.0
 	_cues.clear()
 	_nearby.clear()
 	_camera_snap = true
@@ -112,6 +116,7 @@ func _ready() -> void:
 	camera.limit_bottom = int(Definitions.ARENA_SIZE.y + Presentation.CAMERA_MARGIN)
 	add_child(camera)
 	marker_layer = CanvasLayer.new()
+	marker_layer.layer = 1
 	add_child(marker_layer)
 	marker_canvas = Control.new()
 	marker_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -126,11 +131,16 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if main.mode == "result" and not main.combat_audio.paused:
+		_result_effect_time += delta
+		while _result_effect_time >= main.DT:
+			_result_effect_time -= main.DT
+			advance_effects(false)
 	sync(main.sim)
 	for ship_view in _ships.values():
 		if ship_view.visible and main.mode == "sailing":
 			ship_view.advance_motion(delta)
-	if main.mode == "sailing" or main.mode == "result":
+	if main.mode == "sailing" or (main.mode == "result" and not main.combat_audio.paused):
 		_fit_camera(delta)
 	marker_canvas.queue_redraw()
 
@@ -152,7 +162,7 @@ func _fit_camera(delta: float) -> void:
 	for corner in [bounds.position, Vector2(bounds.end.x, bounds.position.y),
 		Vector2(bounds.position.x, bounds.end.y), bounds.end]:
 		extent = extent.max((corner - desired_center).abs())
-	var desired_zoom: float = Presentation.zoom_for_extent(extent, screen * Vector2(608.0 / 1280.0, 200.0 / 720.0))
+	var desired_zoom: float = Presentation.zoom_for_extent(extent, Presentation.gameplay_rect(screen).size * 0.5)
 	var zoom: float = desired_zoom if _camera_snap else Presentation.approach(camera.zoom.x,
 		desired_zoom, 6.0 if desired_zoom < camera.zoom.x else 2.0, delta)
 	zoom = clampf(zoom, Presentation.ZOOM_MIN, Presentation.ZOOM_MAX)
@@ -287,6 +297,8 @@ func _draw_combat() -> void:
 		var ship: Dictionary = sim.ships[id]
 		if ship["role"] != "practice_target":
 			continue
+		if not _ship_label_visible(ship):
+			continue
 		var p: Vector2 = ship["position"]
 		var r: float = Definitions.VESSELS[ship["vessel_id"]]["radius"] + 12
 		draw_arc(p, r, 0, TAU, 32, TARGET_INK, 3.0)
@@ -295,7 +307,7 @@ func _draw_combat() -> void:
 	if sim.ships.has(3):
 		for id in [2, 3]:
 			var enemy: Dictionary = sim.ships[id]
-			if enemy["active"]:
+			if enemy["active"] and _ship_label_visible(enemy):
 				var p: Vector2 = enemy["position"]
 				var ink := ENEMY_INK
 				if id == 2:
@@ -304,19 +316,17 @@ func _draw_combat() -> void:
 					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -55), p + Vector2(-7, -46), p + Vector2(0, -38), p + Vector2(7, -46)]), ink)
 				_draw_text(font, p + Vector2(15, -38), Presentation.ship_label(sim, id), ink)
 	for shot in sim.projectiles:
-		var p: Vector2 = shot["position"]
-		draw_circle(p, 5, Color.BLACK)
-		draw_circle(p, 3, SHOT_INK)
-		draw_line(p - shot["direction"] * 11, p, SHOT_INK, 2.0)
+		_draw_projectile(shot)
 	for cue in _cues:
 		var p: Vector2 = cue["position"]
-		var fraction: float = float(cue["ticks"]) / (16.0 if cue["type"] == "shot" else (60.0 if cue["type"] == "defeated" else (48.0 if cue["type"] == "damage" else 27.0)))
+		var fraction: float = float(cue["ticks"]) / (float(Definitions.PRESENTATION.smoke_ticks) if cue["type"] == "shot" else (60.0 if cue["type"] == "defeated" else (48.0 if cue["type"] == "damage" else 27.0)))
 		match cue["type"]:
 			"shot":
-				var ship: Dictionary = sim.ships.get(cue["ship_id"], {})
-				if not ship.is_empty():
-					p = cue["position"] + cue["direction"] * Definitions.VESSELS[ship["vessel_id"]]["radius"]
-				draw_circle(p, 4 + 6 * fraction, Color(1.0, 0.9, 0.5, 0.8 * fraction))
+				var age: float = 1.0 - fraction
+				p += cue["direction"] * Definitions.PRESENTATION.smoke_drift * age
+				var radius: float = Definitions.PRESENTATION.smoke_radius * (.3 + .7 * minf(age * 5.0, 1.0))
+				for offset in [Vector2(-.4, .1), Vector2(.4, -.1), Vector2(0, -.3)]:
+					draw_circle(p + offset * radius, radius * .65, Color(.92, .94, .90, .16 * fraction))
 			"hit":
 				match cue.get("ammo", "round"):
 					"round":
@@ -427,11 +437,12 @@ func indicator_geometry(sim, center: Vector2, screen: Rect2) -> Dictionary:
 
 
 func _draw_marker() -> void:
-	if main == null or main.sim.ships.is_empty():
+	if not combat_indicators_visible() or main.sim.ships.is_empty():
 		return
 	var sim = main.sim
 	var screen := Rect2(Vector2.ZERO, marker_canvas.size)
 	var center := camera.get_screen_center_position()
+	_draw_readiness(sim, center, screen)
 	var geometry := indicator_geometry(sim, center, screen)
 	for id in geometry:
 		var target: Vector2 = sim.ships[id]["position"]
@@ -488,3 +499,84 @@ func _warning(font: Font, at: Vector2, angle: float) -> void:
 func _buoy(at: Vector2) -> void:
 	draw_circle(at, 9, Color(0.85, 0.15, 0.1))
 	draw_circle(at, 4, Color.WHITE)
+
+
+## Logical screen geometry: actual ship sides, bow-to-stern gun order and upright counts.
+func readiness_geometry(sim, center: Vector2, screen: Rect2) -> Dictionary:
+	if not sim.result.is_empty() or not sim.ships.has(1) or not sim.ships[1]["active"]:
+		return {}
+	var ship: Dictionary = sim.ships[1]
+	var tuning: Dictionary = Definitions.PRESENTATION
+	var forward := Vector2.from_angle(ship["heading"])
+	var across := Vector2.from_angle(ship["heading"] + PI / 2.0)
+	var radius: float = Definitions.VESSELS[ship["vessel_id"]]["radius"]
+	var origin: Vector2 = screen.get_center() + (ship["position"] - center) * camera.zoom
+	var output := {}
+	for side in Definitions.SIDES:
+		var loads: Array = ship["weapons"][side]["loads"]
+		var sign_side := -1.0 if side == "port" else 1.0
+		var strip: Vector2 = origin + across * sign_side * (radius * .5 * camera.zoom.x + tuning.readiness_offset)
+		var dots := []
+		for i in loads.size():
+			dots.append({"position": strip + forward * ((loads.size() - 1) * .5 - i) * tuning.readiness_spacing,
+				"ready": loads[i] == 1.0})
+		output[side] = {"dots": dots, "count": "%d/%d" % [loads.filter(func(load): return load == 1.0).size(), loads.size()],
+			"label": strip - forward * (loads.size() * .5 * tuning.readiness_spacing + 32)}
+	return output
+
+
+func _draw_readiness(sim, center: Vector2, screen: Rect2) -> void:
+	var font := ThemeDB.fallback_font
+	var tuning: Dictionary = Definitions.PRESENTATION
+	for strip in readiness_geometry(sim, center, screen).values():
+		for dot in strip.dots:
+			marker_canvas.draw_circle(dot.position, tuning.readiness_radius + 2, Color(0.02, .08, .14, .9))
+			marker_canvas.draw_circle(dot.position, tuning.readiness_radius, Color(1, .85, .42) if dot.ready else Color(.65, .73, .8), dot.ready, -1.0 if dot.ready else 1.0)
+		var at: Vector2 = strip.label - Vector2(font.get_string_size(strip.count, HORIZONTAL_ALIGNMENT_LEFT, -1, tuning.readiness_font).x * .5, -6)
+		marker_canvas.draw_string_outline(font, at, strip.count, HORIZONTAL_ALIGNMENT_LEFT, -1, tuning.readiness_font, 4, Color(.02, .06, .1))
+		marker_canvas.draw_string(font, at, strip.count, HORIZONTAL_ALIGNMENT_LEFT, -1, tuning.readiness_font, Color(1, .9, .65))
+
+
+func _ship_label_visible(ship: Dictionary) -> bool:
+	var safe := Presentation.gameplay_rect(get_viewport_rect().size)
+	var projected: Vector2 = get_canvas_transform() * ship["position"]
+	var radius: float = Definitions.VESSELS[ship["vessel_id"]]["radius"]
+	var half: Vector2 = Presentation.padded_art_half(radius, ship["heading"]) * camera.zoom
+	var label := Rect2(projected + Vector2(-60, -70) * camera.zoom, Vector2(190, 40) * camera.zoom)
+	return safe.encloses(Rect2(projected - half, half * 2)) and safe.encloses(label)
+
+
+func combat_indicators_visible() -> bool:
+	return main != null and main.mode == "sailing" and not main.settings_menu.visible
+
+
+func projectile_render_position(shot: Dictionary) -> Vector2:
+	var record: Dictionary = _projectile_visuals.get(shot["id"], {})
+	if record.is_empty():
+		return shot["position"]
+	var traveled: float = shot["position"].distance_to(record["origin"])
+	var correction: Vector2 = (record["muzzle"] - record["origin"]).limit_length(Definitions.PRESENTATION.muzzle_max_correction) * (1.0 - clampf(traveled / Definitions.PRESENTATION.muzzle_blend_distance, 0.0, 1.0))
+	return shot["position"] + correction + Vector2.UP * Presentation.elevation(traveled, record["distance"])
+
+
+func _iron_ball(p: Vector2, radius: float) -> void:
+	draw_circle(p, radius + 1.0, Color(.95, .96, .90, .9))
+	draw_circle(p, radius, Color(.12, .14, .17))
+	draw_circle(p + Vector2(-1, -1), radius * .33, Color(.6, .65, .7))
+
+
+func _draw_projectile(shot: Dictionary) -> void:
+	var p: Vector2 = projectile_render_position(shot)
+	draw_circle(shot["position"], 4.0, Color(0, .03, .06, .25))
+	match shot["ammo"]:
+		"chain":
+			var rotation_offset := Vector2.from_angle(shot["position"].distance_to(_projectile_visuals.get(shot["id"], {}).get("origin", shot["position"])) * Definitions.PRESENTATION.chain_rotation_per_unit) * 4.5
+			draw_line(p - rotation_offset, p + rotation_offset, Color(.95, .96, .90), 3.0)
+			draw_line(p - rotation_offset, p + rotation_offset, Color(.2, .22, .25), 1.0)
+			_iron_ball(p - rotation_offset, 2.5)
+			_iron_ball(p + rotation_offset, 2.5)
+		"grape":
+			for offset in [Vector2.ZERO, Vector2(-3, -3), Vector2(3, -3), Vector2(-3, 3), Vector2(3, 3)]:
+				_iron_ball(p + offset, 1.3)
+		_:
+			_iron_ball(p, 3.2)

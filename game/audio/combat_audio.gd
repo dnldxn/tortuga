@@ -1,6 +1,7 @@
 extends Node
-## Presentation-only, bounded non-positional audio. consume() is called once per sim tick.
+## Presentation-only, bounded positional cannon audio. consume() is called once per sim tick.
 
+const Definitions := preload("res://sim/definitions.gd")
 const Settings := preload("res://settings.gd")
 const CANNON := preload("res://assets/audio/cannon.wav")
 const IMPACT := preload("res://assets/audio/impact.wav")
@@ -13,6 +14,7 @@ var paused := false
 var hit_groups := {}  # target/track -> tick of first audible hit
 var dispatch_counts := {"cannon": 0, "impact": 0, "splash": 0}
 var _tick := 0
+var arena_view: Node2D
 
 
 func _ready() -> void:
@@ -23,12 +25,16 @@ func _ready() -> void:
 		return
 	for kind in effects:
 		var stream: AudioStream = {"cannon": CANNON, "impact": IMPACT, "splash": SPLASH}[kind]
-		var count: int = {"cannon": 3, "impact": 2, "splash": 1}[kind]
+		var count: int = {"cannon": Definitions.PRESENTATION.cannon_voices, "impact": 2, "splash": 1}[kind]
 		for i in count:
-			var player := AudioStreamPlayer.new()
+			var player = AudioStreamPlayer2D.new() if kind == "cannon" else AudioStreamPlayer.new()
+			if kind == "cannon":
+				player.attenuation = 0.0
+				player.max_distance = 100000.0
+				player.panning_strength = 1.0
 			player.stream = stream
 			player.bus = effect_bus
-			player.volume_db = -18.0
+			player.volume_db = Definitions.PRESENTATION.cannon_db if kind == "cannon" else -18.0
 			player.max_polyphony = 1
 			add_child(player)
 			effects[kind].append(player)
@@ -41,6 +47,14 @@ func _ready() -> void:
 	ambient.bus = ambient_bus
 	ambient.volume_db = -20.0
 	add_child(ambient)
+
+
+func _process(_delta: float) -> void:
+	# A mute must not leave an inaudible tail to emerge on later unmute.
+	if AudioServer.is_bus_mute(AudioServer.get_bus_index(Settings.BUSES["effects"])) or AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")):
+		for kind in effects:
+			for player in effects[kind]:
+				player.stop()
 
 
 func start_encounter() -> void:
@@ -58,8 +72,8 @@ func consume(events: Array) -> void:
 			hit_groups.erase(key)
 	for event in events:
 		match event.get("type", ""):
-			"volley":
-				_play("cannon")
+			"shot":
+				_play("cannon", event)
 			"hit":
 				var key := "%s/%s" % [event["target_id"], event["track"]]
 				if not hit_groups.has(key):
@@ -95,9 +109,45 @@ func clear() -> void:
 		dispatch_counts[kind] = 0
 
 
-func _play(kind: String) -> void:
+func finish_encounter() -> void:
+	if ambient != null:
+		ambient.stop()
+	hit_groups.clear()
+
+
+## Native panner receives a clamped screen coordinate mapped back through the camera.
+func cannon_mix(event: Dictionary) -> Dictionary:
+	var tuning: Dictionary = Definitions.PRESENTATION
+	var source: Vector2 = event.get("position", Vector2.ZERO)
+	var position := source
+	var gain := 1.0
+	if arena_view != null:
+		var sim = arena_view.main.sim
+		if sim.ships.has(event.get("ship_id", -1)):
+			source = sim.ships[event["ship_id"]]["position"]
+		var transform: Transform2D = arena_view.get_canvas_transform()
+		var screen: Vector2 = arena_view.get_viewport_rect().size
+		var projected: Vector2 = transform * source
+		projected.x = clampf(projected.x, screen.x * (.5 - tuning.audio_pan_extent * .5), screen.x * (.5 + tuning.audio_pan_extent * .5))
+		projected.y = screen.y * .5
+		position = transform.affine_inverse() * projected
+		if sim.ships.has(sim.PLAYER_ID):
+			gain = lerpf(1.0, tuning.audio_far_gain, clampf(source.distance_to(sim.ships[sim.PLAYER_ID]["position"]) / tuning.audio_distance, 0.0, 1.0))
+	var variation: float = float(int(event.get("projectile_id", dispatch_counts["cannon"])) % 7 - 3) / 3.0
+	return {"position": position, "volume_db": tuning.cannon_db + linear_to_db(gain) - absf(variation) * tuning.cannon_level_variation,
+		"pitch": 1.0 + variation * tuning.cannon_pitch_variation}
+
+
+func _play(kind: String, event: Dictionary = {}) -> void:
 	for player in effects[kind]:
 		if not player.playing:
+			if kind == "cannon":
+				var mix: Dictionary = cannon_mix(event)
+				player.global_position = mix["position"]
+				player.volume_db = mix["volume_db"]
+				player.pitch_scale = mix["pitch"]
 			player.play()
 			dispatch_counts[kind] += 1
-			return  # All busy: drop the newest, never interrupt a voice.
+			return
+	if kind == "cannon":
+		push_error("Cannon capacity exceeded (unsupported load beyond overlapping 32-shot volleys)")

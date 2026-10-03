@@ -34,7 +34,7 @@ After plan 06 changes the test entry point, use `bash game/tests/run_settings_ch
 
 ## Rendered/playable checks — macOS owner report
 
-Launch `"$GODOT" --path game`. Choose **Target practice** and each vessel, first by keyboard, then by mouse. Use the on-screen bindings; the target initially lies due east, outside both broadsides. Turn to acquire it, fire, and inspect projectile travel, muzzle/hit/splash cues, target condition and gun reload progress. Fire a partial volley, compare the other side, cycle one side, and try firing with no loaded guns and firing without aim assist. Reset while shots travel; verify there are no ghost impacts.
+Launch `"$GODOT" --path game`. Choose **Target practice** and each vessel, first by keyboard, then by mouse. Use the on-screen bindings; the target initially lies due east, outside both broadsides. Turn to acquire it, fire, and inspect projectile travel, muzzle/hit/splash cues, target condition and gun reload progress. Fire a partial volley, compare the other side, cycle one side, and try firing with no loaded guns and firing into an empty straight broadside lane. Reset while shots travel; verify there are no ghost impacts.
 
 For every vessel, sink the brig using Round (hull), disable sails using Chain and disable crew using Grape. Check that the practice session stays open after defeat and the defeated target no longer blocks sailing. Pause during flight/reload, press fire/cycle/reset while paused, and confirm nothing advances or defers; after focus loss, explicitly resume. Test pause restart/return. At **1280×720** and **1920×1080**, inspect all text, corner panels, both range arcs, the on/offscreen target markers, and mouse/keyboard menu access.
 

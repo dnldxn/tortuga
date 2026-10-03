@@ -203,9 +203,9 @@ func check_snapshot(kind: String, events: Array) -> void:
 		_check(events.filter(func(e): return e["type"] == "shot").size() == 8
 			and events.filter(func(e): return e["type"] == "volley").size() == 1,
 			"eight raw shots produce one volley")
-		_check(main.combat_audio.dispatch_counts["cannon"] == 1
+		_check(main.combat_audio.dispatch_counts["cannon"] == 8
 			and main.combat_audio.dispatch_counts["impact"] == 1,
-			"one cannon and one impact dispatched through production adapter")
+			"eight cannons and one impact dispatched through production adapter")
 		var ammo: String = {"full": "round", "half": "chain", "quarter": "grape"}[kind]
 		var track: String = Definitions.AMMO[ammo]["track"]
 		var damage: float = Definitions.AMMO[ammo]["damage"] * 2.0

@@ -1,6 +1,7 @@
 extends RefCounted
 ## Read-only logical-canvas calculations and per-tick simulation event translation.
 
+const Definitions := preload("res://sim/definitions.gd")
 const SAFE := Rect2(32, 160, 1216, 400)
 const ZOOM_MIN := 0.75
 const ZOOM_MAX := 1.10
@@ -8,15 +9,16 @@ const CAMERA_MARGIN := 240.0
 
 
 static func gameplay_rect(screen: Vector2) -> Rect2:
-	return Rect2(SAFE.position * screen / Vector2(1280, 720),
-		SAFE.size * screen / Vector2(1280, 720)).grow(-24.0)
+	var tuning: Dictionary = Definitions.PRESENTATION
+	return Rect2(tuning.side_reserved, tuning.top_reserved, screen.x - 2 * tuning.side_reserved,
+		screen.y - tuning.top_reserved - tuning.bottom_reserved).grow(-tuning.combat_inset)
 
 
 static func padded_art_half(radius: float, heading: float) -> Vector2:
 	var c := absf(cos(heading))
 	var s := absf(sin(heading))
 	return Vector2(radius * c + radius * .5 * s,
-		radius * s + radius * .5 * c) + Vector2(24, 24)
+		radius * s + radius * .5 * c) + Vector2.ONE * Definitions.PRESENTATION.art_padding
 
 
 static func zoom_for_extent(extent: Vector2, half_safe: Vector2) -> float:
@@ -86,8 +88,7 @@ static func marker_badge(sim, id: int) -> String:
 ## Full logical viewport inside expanded arena AND player inside gameplay safe region.
 static func clamp_center(center: Vector2, player: Vector2, zoom: float, screen: Vector2, arena: Vector2) -> Vector2:
 	var half := screen / (2.0 * zoom)
-	var safe := Rect2(Vector2(SAFE.position.x * screen.x / 1280.0,
-		SAFE.position.y * screen.y / 720.0), SAFE.size * screen / Vector2(1280, 720))
+	var safe := gameplay_rect(screen).grow(-Definitions.PRESENTATION.player_padding)
 	var low := Vector2.ONE * -CAMERA_MARGIN + half
 	var high := arena + Vector2.ONE * CAMERA_MARGIN - half
 	var player_low := player + (screen * .5 - safe.end) / zoom
@@ -96,3 +97,31 @@ static func clamp_center(center: Vector2, player: Vector2, zoom: float, screen: 
 	high = high.min(player_high)
 	return Vector2(clampf(center.x, low.x, high.x) if low.x <= high.x else player.x,
 		clampf(center.y, low.y, high.y) if low.y <= high.y else player.y)
+
+
+## Snapshot first entry along the actual forward lane, never center distance.
+static func arc_reference(sim, event: Dictionary) -> Dictionary:
+	var range_left: float = Definitions.AMMO[event["ammo"]]["range"]
+	var start: Vector2 = event["position"]
+	var end: Vector2 = start + event["direction"] * range_left
+	var owner: Dictionary = sim.ships.get(event["ship_id"], {})
+	var distance := INF
+	var target := -1
+	var ids: Array = sim.ships.keys()
+	ids.sort()
+	for id in ids:
+		var ship: Dictionary = sim.ships[id]
+		if id == event["ship_id"] or not ship["active"] or ship["team"] == owner.get("team", -1):
+			continue
+		var entry: float = sim.segment_circle(start, end, ship["position"], Definitions.VESSELS[ship["vessel_id"]]["radius"])
+		if entry >= 0.0 and entry * range_left < distance:
+			distance = entry * range_left
+			target = id
+	return {"distance": range_left * Definitions.PRESENTATION.arc_default_range if target < 0 else distance, "target_id": target}
+
+
+static func elevation(traveled: float, reference: float) -> float:
+	var tuning: Dictionary = Definitions.PRESENTATION
+	if reference <= tuning.arc_close or traveled >= reference:
+		return 0.0
+	return tuning.arc_height * clampf((reference - tuning.arc_close) / tuning.arc_full, 0.0, 1.0) * sin(PI * clampf(traveled / reference, 0.0, 1.0))

@@ -54,6 +54,7 @@ func _ready() -> void:
 	box.add_theme_constant_override("separation", 12)
 	margin.add_child(box)
 	var title := Label.new()
+	title.theme_type_variation = "NauticalHeading"
 	title.text = "Settings"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)

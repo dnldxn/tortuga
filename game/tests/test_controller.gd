@@ -338,19 +338,9 @@ func _test_hud(t) -> void:
 	for control in [hud.name_label, hud.side_labels["port"], main.pause_menu.bindings_label,
 			main.selection.sailing_button, main.pause_menu.resume_button]:
 		t.check(control.get_theme_font_size("font_size") >= 18, "font size >= 18 for %s" % control.name)
-	# Frigate has the widest broadside panels; corners must stay compact and off the centre.
 	main.start_practice("frigate")
-	var view := Rect2(0, 0, 1280, 720)
-	var centre := Rect2(320, 180, 640, 360)
-	var area := 0.0
-	for panel in hud.panels:
-		var sz: Vector2 = panel.get_combined_minimum_size()
-		var anchor := Vector2(0.0 if panel.anchor_left == 0.0 else 1.0, 0.0 if panel.anchor_top == 0.0 else 1.0)
-		var rect := Rect2(view.size * anchor + Vector2(12, 12) * (Vector2.ONE - anchor * 2.0) - sz * anchor, sz)
-		area += sz.x * sz.y
-		t.check(view.encloses(rect) and not rect.intersects(centre),
-			"HUD corner %s (%s) stays on screen and off the centre" % [panel.get_index(), sz])
-	t.check(area <= 0.28 * view.get_area(), "HUD panels cover <= 28%% of 1280x720 (%.1f%%)" % (100.0 * area / view.get_area()))
+	t.check(hud.roster_cards.size() == 3 and not hud.panels[2].visible,
+		"roster has stable cards and hides absent third ship")
 
 
 func _all_text(node: Node) -> String:
@@ -374,9 +364,9 @@ func _test_weapon_hud(t) -> void:
 		and panel_of.call(hud.side_labels["port"]) != panel_of.call(hud.side_labels["starboard"]),
 		"each broadside occupies its own panel apart from ship conditions")
 	t.check("OUTSIDE ARC" not in text and "ASSIST" not in text, "no aim-assist status in the HUD")
-	var visible_bars := func(side: String) -> Array:
-		return hud.gun_bars[side].filter(func(bar): return bar.visible).map(func(bar): return bar.value)
-	t.check(visible_bars.call("port") == [100.0, 100.0, 100.0, 100.0], "sloop shows four loaded port gun bars")
+	var readiness := func(side: String) -> Array:
+		return main.arena_view.readiness_geometry(main.sim, _ship()["position"], Rect2(0, 0, 1280, 720))[side].dots.map(func(dot): return dot.ready)
+	t.check(readiness.call("port") == [true, true, true, true], "sloop has four ready port dots")
 	main.set_paused(true)
 	t.check("Round: hull / Chain: sails / Grape: crew" in _all_text(main.pause_menu)
 		and "restarts that side" in _all_text(main.pause_menu), "ammo tracks and cycle reload cost explained on pause")
@@ -384,14 +374,14 @@ func _test_weapon_hud(t) -> void:
 	main.sim.ships[1]["weapons"]["port"]["ammo"] = "grape"
 	main.sim.ships[1]["weapons"]["port"]["loads"] = [1.0, 0.5, 0.0, 0.25]
 	hud.refresh(main.sim)
-	t.check("Port · Grape · 1/4 ready" in _all_text(hud) and visible_bars.call("port")[1] == 50.0
+	t.check("Port · Grape · 1/4 ready" in _all_text(hud) and not readiness.call("port")[1]
 		and "Starboard · Round · 4/4 ready" in _all_text(hud),
 		"one side changes ammo/progress without affecting opposite broadside")
 	main.sim.ships[1]["weapons"]["port"]["loads"] = [0.999, 0.0, 0.0, 0.0]
 	hud.refresh(main.sim)
 	t.check("Port · Grape · 0/4 ready" in hud.side_labels["port"].text
-		and visible_bars.call("port")[0] == 99.0
-		and visible_bars.call("starboard")[0] == 100.0,
+		and not readiness.call("port")[0]
+		and readiness.call("starboard")[0],
 		"near-ready gun displays below 100%; fully loaded opposite side shows 100%")
 	# Leave enough headroom that this tick's reload cannot complete the gun before fire.
 	main.sim.ships[1]["weapons"]["port"]["loads"][0] = 0.99

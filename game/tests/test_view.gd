@@ -190,7 +190,7 @@ func _test_cue_lifecycle(t) -> void:
 	main.set_paused(false)
 	main.advance_tick()
 	t.check(view._cues[0]["ticks"] == life - 1, "one resumed tick ages cues once")
-	view.consume_events([{"type": "hit", "position": Vector2(1, 2), "track": "crew", "damage": 5}])
+	view.consume_events([{"type": "hit", "projectile_id": 999, "position": Vector2(1, 2), "track": "crew", "damage": 5}])
 	t.check(view._cues.any(func(c): return c["type"] == "hit" and c["track"] == "crew"), "crew hit has a cue")
 	main.restart_practice()
 	t.check(view._cues.is_empty() and main.sim.projectiles.is_empty(), "reset clears cues and in-flight shots")

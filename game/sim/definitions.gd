@@ -5,6 +5,22 @@ const ARENA_SIZE := Vector2(6000, 4200)
 const ARENA_MARGIN := 160.0
 
 ## Reef Glass presentation tuning; never used by simulation movement or contacts.
+const PRESENTATION := {
+	"ui_margin": 12.0, "top_reserved": 160.0, "bottom_reserved": 160.0,
+	"combat_inset": 24.0, "side_reserved": 32.0,
+	"art_padding": 24.0, "player_padding": 80.0, "readiness_spacing": 9.0,
+	"readiness_radius": 3.0, "readiness_offset": 12.0,
+	"readiness_font": 18,
+	"arc_height": 12.0, "arc_close": 35.0, "arc_full": 180.0,
+	"arc_default_range": .45, "muzzle_blend_distance": 45.0, "muzzle_max_correction": 32.0,
+	"smoke_ticks": 60, "smoke_radius": 10.0, "smoke_drift": 12.0,
+	# 32 guns, two overlapping loads; impact+smoke+damage/defeat headroom.
+	"cue_capacity": 256, "cannon_voices": 64,
+	"cannon_db": -40.0, "cannon_pitch_variation": .025,
+	"cannon_level_variation": .6, "chain_rotation_per_unit": .10,
+	"audio_pan_extent": .55, "audio_distance": 1400.0, "audio_far_gain": .65,
+}
+
 const WATER := {
 	"animation_speed": 0.75,
 	"drift_speed": 0.1,

@@ -21,13 +21,27 @@ def samples(name, duration, seed, peak):
     sea = name == "sea"
     values = []
     lp = 0.0
+    body = 0.0
+    rumble = 0.0
     for i in range(count + (round(.25 * RATE) if sea else 0)):
         t = i / RATE
         u = t / duration
         n = rng.uniform(-1.0, 1.0)
         lp += .08 * (n - lp)
         if name == "cannon":
-            value = (.65 * math.sin(2 * math.pi * 65 * t) + .35 * n) * math.exp(-9 * t)
+            # Broadband ignition crack, turbulent low body, falling resonances,
+            # and two diffuse reflections; no sampled third-party material.
+            body += .025 * (n - body)
+            rumble += .004 * (n - rumble)
+            attack = (n - lp) * math.exp(-95 * t) * .9
+            pressure = body * math.exp(-8 * t) * 5.0
+            low = rumble * math.exp(-6 * t) * 4.0
+            resonances = (.13 * math.sin(2 * math.pi * (82*t - 24*t*t))
+                          + .08 * math.sin(2 * math.pi * (47*t - 8*t*t))) * math.exp(-13*t)
+            reflections = sum(.08 * math.sin(2*math.pi*113*(t-delay))
+                              * math.exp(-24*(t-delay)) if t >= delay else 0
+                              for delay in (.038, .081))
+            value = attack + pressure + low + resonances + reflections
         elif name == "impact":
             value = (.5 * math.sin(2 * math.pi * 170 * t) + .3 * math.sin(2 * math.pi * 310 * t) + .2 * n) * math.exp(-22 * t)
         elif name == "splash":
@@ -35,6 +49,10 @@ def samples(name, duration, seed, peak):
         else:
             value = lp * (.65 + .2 * math.sin(2 * math.pi * t / 8) + .15 * math.sin(4 * math.pi * t / 8))
         values.append(value)
+
+    if name == "cannon":
+        dc = sum(values) / len(values)
+        values = [value - dc for value in values]
 
     if sea:
         # Blend the extra tail into the original head; the wrap then joins the
@@ -50,7 +68,7 @@ def samples(name, duration, seed, peak):
             values[i] *= i / fade
             values[-1 - i] *= i / fade
 
-    mean = sum(values) / len(values)
+    mean = 0.0 if name == "cannon" else sum(values) / len(values)
     values = [value - mean for value in values]
     scale = peak / max(abs(value) for value in values)
     return struct.pack("<%dh" % len(values), *(round(max(-1, min(1, value * scale)) * 32767)

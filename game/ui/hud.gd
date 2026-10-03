@@ -1,5 +1,5 @@
 extends Control
-## Read-only HUD: wind, two fixed-ID enemy rows, player tracks and independent side cards.
+## Read-only HUD: stable equal roster cards and compact navigation/ammo panels.
 ## Help text lives in the pause menu.
 ## Feedback ages in physics ticks.
 
@@ -10,7 +10,7 @@ const Bindings := preload("res://input_bindings.gd")
 
 const COMPASS := ["E", "SE", "S", "SW", "W", "NW", "N", "NE"]
 const STATS := ["hull", "sails", "crew"]
-const MARGIN := 12
+const MARGIN: int = Definitions.PRESENTATION.ui_margin
 const ICONS := {
 	"hull": preload("res://assets/ui/hull.svg"), "sails": preload("res://assets/ui/sails.svg"),
 	"crew": preload("res://assets/ui/crew.svg"), "speed": preload("res://assets/ui/speed.svg"),
@@ -23,7 +23,7 @@ var wind_arrow: Control
 var wind_heading := 0.0
 var target_label: Label
 var target_state_label: Label
-var panels := []  # the four corner PanelContainers
+var panels := []  # roster cards, navigation panel, port and starboard panels
 var ship_stats := {}  # stat -> [ProgressBar, Label]
 var target_stats := {}
 var second_target_block: VBoxContainer
@@ -33,7 +33,6 @@ var second_target_stats := {}
 var defeated_notice: Label
 var side_labels := {}  # side -> header Label
 var ammo_labels := {}
-var gun_bars := {}  # side -> Array[ProgressBar], prebuilt for the largest vessel
 var feedback_labels := {}
 var _last_ammo := {}
 var _ammo_notice := {}  # side -> ticks remaining after a real ammo change
@@ -47,16 +46,48 @@ var _escape_prev_ticks := 0  # UI-local, only to notice a progress reset
 var _escape_reset_notice := false
 
 
+var roster_row: HBoxContainer
+var roster_cards := {}
+var player_state_label: Label
+
 func _ready() -> void:
 	set_anchors_preset(PRESET_FULL_RECT)
 	mouse_filter = MOUSE_FILTER_IGNORE
-	var status := _corner(PRESET_TOP_LEFT)
-	name_label = _label(status)
-	var player_panel := _corner(PRESET_BOTTOM_LEFT)
-	for stat in STATS:
-		ship_stats[stat] = _stat_row(player_panel, stat)
-	crew_notice = _label(player_panel)
-	var motion := _row(status)
+	roster_row = HBoxContainer.new()
+	roster_row.set_anchors_and_offsets_preset(PRESET_TOP_WIDE)
+	roster_row.offset_left = MARGIN
+	roster_row.offset_right = -MARGIN
+	roster_row.offset_top = MARGIN
+	roster_row.add_theme_constant_override("separation", 12)
+	add_child(roster_row)
+	for id in [1, 2, 3]:
+		var panel := PanelContainer.new()
+		panel.size_flags_horizontal = SIZE_EXPAND_FILL
+		roster_row.add_child(panel)
+		panels.append(panel)
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 2)
+		panel.add_child(box)
+		var title := _label(box)
+		title.theme_type_variation = "NauticalHeading"
+		title.add_theme_font_size_override("font_size", 20)
+		var stats := {}
+		for stat in STATS:
+			stats[stat] = _stat_row(box, stat)
+		var state := _label(box)
+		roster_cards[id] = {"panel": panel, "title": title, "stats": stats, "state": state}
+	name_label = roster_cards[1].title
+	ship_stats = roster_cards[1].stats
+	player_state_label = roster_cards[1].state
+	target_label = roster_cards[2].title
+	target_stats = roster_cards[2].stats
+	target_state_label = roster_cards[2].state
+	second_target_block = roster_cards[3].title.get_parent()
+	second_target_label = roster_cards[3].title
+	second_target_stats = roster_cards[3].stats
+	second_target_state_label = roster_cards[3].state
+	var navigation := _corner(PRESET_BOTTOM_LEFT)
+	var motion := _row(navigation)
 	_icon(motion, "speed")
 	speed_label = _label(motion)
 	wind_arrow = Control.new()
@@ -65,77 +96,40 @@ func _ready() -> void:
 	wind_arrow.draw.connect(_draw_wind_arrow)
 	motion.add_child(wind_arrow)
 	wind_label = _label(motion)
-	var target := _corner(PRESET_TOP_RIGHT)
-	target_label = _label(target)
-	var first_stats := _row(target)
-	for stat in STATS:
-		target_stats[stat] = _stat_row(first_stats, stat, true)
-	var where := _row(target)
-	_icon(where, "distance")
-	target_state_label = _label(where)
-	second_target_block = VBoxContainer.new()
-	second_target_block.add_theme_constant_override("separation", 2)
-	target.add_child(second_target_block)
-	second_target_label = _label(second_target_block)
-	var second_stats := _row(second_target_block)
-	for stat in STATS:
-		second_target_stats[stat] = _stat_row(second_stats, stat, true)
-	var second_where := _row(second_target_block)
-	_icon(second_where, "distance")
-	second_target_state_label = _label(second_where)
-	defeated_notice = _label(target)
-	var max_guns := 0
-	for vessel in Definitions.VESSELS.values():
-		max_guns = maxi(max_guns, vessel["guns_per_side"])
-	for side in Definitions.SIDES:
-		var side_box := _corner(PRESET_BOTTOM_LEFT if side == "port" else PRESET_BOTTOM_RIGHT)
-		if side == "port":
-			var panel: Control = side_box.get_parent()
-			panel.offset_left += 310
-			panel.offset_right += 310
-		_make_side(side_box, side, max_guns)
-	_make_escape()
-
-
-## Top-centre escape panel (plan 04): rule line, status line and countdown bar.
-func _make_escape() -> void:
-	escape_panel = PanelContainer.new()
-	escape_panel.mouse_filter = MOUSE_FILTER_IGNORE
-	add_child(escape_panel)
-	escape_panel.set_anchors_and_offsets_preset(PRESET_CENTER_TOP, PRESET_MODE_MINSIZE, MARGIN)
-	escape_panel.grow_horizontal = GROW_DIRECTION_BOTH
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 2)
-	escape_panel.add_child(box)
-	escape_rule_label = _label(box)
-	escape_status_label = _label(box)
+	crew_notice = _label(navigation)
+	crew_notice.hide()
+	defeated_notice = _label(navigation)
+	defeated_notice.hide()
+	escape_panel = navigation.get_parent()
+	escape_rule_label = _label(navigation)
+	escape_status_label = _label(navigation)
 	for label in [escape_rule_label, escape_status_label]:
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.custom_minimum_size.x = 340  # leaves the two-enemy rows unobstructed at 720p
-	escape_bar = _bar(box, Vector2(340, 10))
-
-
-func _make_side(parent: Node, side: String, max_guns: int) -> void:
-	var header := _row(parent)
-	_icon(header, "cannon")
-	side_labels[side] = _label(header)
-	ammo_labels[side] = _label(parent)
-	ammo_labels[side].add_theme_font_size_override("font_size", 16)
-	var guns := _row(parent)
-	guns.add_theme_constant_override("separation", 4)
-	gun_bars[side] = []
-	for i in max_guns:
-		var bar := _bar(guns, Vector2(12, 22))
-		bar.fill_mode = ProgressBar.FILL_BOTTOM_TO_TOP
-		var pip := Label.new()
-		pip.add_theme_font_size_override("font_size", 16)
-		pip.mouse_filter = MOUSE_FILTER_IGNORE
-		bar.add_child(pip)
-		gun_bars[side].append(bar)
-	feedback_labels[side] = _label(parent)
-	feedback_labels[side].add_theme_color_override("font_color", Color(1.0, 0.55, 0.45))
-	feedback_labels[side].visible = false
+		label.custom_minimum_size.x = 420
+		label.add_theme_font_size_override("font_size", 18)
+	escape_bar = _bar(navigation, Vector2(420, 10))
+	var sides := HBoxContainer.new()
+	sides.set_anchors_and_offsets_preset(PRESET_BOTTOM_RIGHT)
+	sides.grow_horizontal = GROW_DIRECTION_BEGIN
+	sides.grow_vertical = GROW_DIRECTION_BEGIN
+	sides.offset_right = -MARGIN
+	sides.offset_bottom = -MARGIN
+	sides.add_theme_constant_override("separation", 12)
+	add_child(sides)
+	for side in Definitions.SIDES:
+		var panel := PanelContainer.new()
+		sides.add_child(panel)
+		panels.append(panel)
+		var box := VBoxContainer.new()
+		panel.add_child(box)
+		var header := _row(box)
+		_icon(header, "cannon")
+		side_labels[side] = _label(header)
+		ammo_labels[side] = _label(box)
+		ammo_labels[side].autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ammo_labels[side].custom_minimum_size.x = 330
+		feedback_labels[side] = _label(box)
+		feedback_labels[side].visible = false
 
 
 func reset_effects() -> void:
@@ -175,6 +169,10 @@ func refresh(sim) -> void:
 	var vessel: Dictionary = Definitions.VESSELS[ship["vessel_id"]]
 	name_label.text = "%s · %s" % [vessel["display_name"], "REEFED" if ship["reefed"] else "FULL SAILS"]
 	_set_stats(ship_stats, ship, vessel)
+	player_state_label.text = _ship_state(ship)
+	for id in roster_cards:
+		if sim.ships.has(id):
+			roster_cards[id].panel.modulate = Color.WHITE if sim.ships[id]["active"] else Color(0.72, 0.72, 0.72, 1.0)
 	crew_notice.text = "Crew losses slow reload" if ship["crew"] < vessel["crew"] else ""
 	speed_label.text = "%d" % roundi(ship["speed"])
 	var sector := posmod(roundi(sim.wind_heading / (PI / 4.0)), 8)
@@ -183,6 +181,7 @@ func refresh(sim) -> void:
 	wind_arrow.queue_redraw()
 	var target: Dictionary = sim.ships.get(2, {})
 	panels[1].visible = not target.is_empty()
+	panels[2].visible = sim.ships.has(3)
 	second_target_block.visible = sim.ships.has(3)
 	defeated_notice.visible = false
 	if not second_target_block.visible:
@@ -196,37 +195,29 @@ func refresh(sim) -> void:
 		target_label.text = "TARGET · Brig" if sim.preset_id == "practice" else Presentation.ship_label(sim, 2)
 		_set_stats(target_stats, target, target_vessel)
 		var distance := roundi(target["position"].distance_to(ship["position"]))
-		var state := "Active" if target["active"] else ("SUNK" if "sunk" in target["defeat_reasons"] else "DISABLED · " + " · ".join(target["defeat_reasons"]).to_upper())
+		var state := _ship_state(target)
 		target_state_label.text = "%d · %s" % [distance, state]
 	if second_target_block.visible:
 		var second: Dictionary = sim.ships[3]
 		second_target_label.text = "◆ " + Presentation.ship_label(sim, 3)
 		target_label.text = "▲ " + Presentation.ship_label(sim, 2)
 		_set_stats(second_target_stats, second, Definitions.VESSELS[second["vessel_id"]])
-		var second_state := "Active" if second["active"] else ("SUNK" if "sunk" in second["defeat_reasons"] else "DISABLED · " + " · ".join(second["defeat_reasons"]).to_upper())
+		var second_state := _ship_state(second)
 		second_target_state_label.text = "%d · %s" % [roundi(second["position"].distance_to(ship["position"])), second_state]
-		defeated_notice.visible = sim.result.is_empty() and target["active"] != second["active"]
-		defeated_notice.text = "1 of 2 enemies defeated" if defeated_notice.visible else ""
+		defeated_notice.visible = false
+		defeated_notice.text = "1 of 2 enemies defeated" if sim.result.is_empty() and target["active"] != second["active"] else ""
 	for side in Definitions.SIDES:
 		var weapon: Dictionary = ship["weapons"][side]
 		var loads: Array = weapon["loads"]
 		var ready := loads.filter(func(load): return load == 1.0).size()
-		var bars: Array = gun_bars[side]
-		for i in bars.size():
-			bars[i].visible = i < loads.size()
-			if i < loads.size():
-				# Only a fully loaded gun reads 100; a nearly loaded one caps at 99.
-				bars[i].value = 100 if loads[i] == 1.0 else mini(99, roundi(loads[i] * 100.0))
-				bars[i].get_child(0).text = "●" if loads[i] == 1.0 else ("◑" if loads[i] > 0.0 else "○")
 		var ammo: Dictionary = Definitions.AMMO[weapon["ammo"]]
 		if _last_ammo.has(side) and _last_ammo[side] != weapon["ammo"]:
 			_ammo_notice[side] = 48
 		_last_ammo[side] = weapon["ammo"]
-		var glyph: String = {"round": "●", "chain": "○—○", "grape": "∴"}[weapon["ammo"]]
 		side_labels[side].text = "%s · %s · %d/%d ready" % [side.capitalize(), ammo["display_name"], ready, loads.size()]
-		ammo_labels[side].text = "%s fire · %s cycle | %s %s → %s" % [
+		ammo_labels[side].text = "%s fire · %s cycle | → %s" % [
 			Bindings.binding_label("fire_" + side), Bindings.binding_label("cycle_" + side),
-			glyph, ammo["display_name"], ammo["track"].capitalize()]
+			ammo["track"].capitalize()]
 		if _ammo_notice.has(side):
 			ammo_labels[side].text += " · LOAD RESET"
 		feedback_labels[side].text = "no loaded guns" if _feedback.has(side) else ""
@@ -259,10 +250,10 @@ func _refresh_escape(sim, ship: Dictionary) -> void:
 		_escape_reset_notice = false
 	_escape_prev_ticks = ticks
 	if not sim.escape_armed:
-		escape_rule_label.text = "Escape unarmed: close to within %d of an active enemy to enable escape." % arm
+		escape_rule_label.text = "Escape unarmed: close to within %d of an enemy." % arm
 		escape_status_label.text = distance_text[0].to_upper() + distance_text.substr(1)
 		return
-	escape_rule_label.text = "Escape armed: stay farther than %d from EVERY active enemy for %s s." % [clear, Definitions.ESCAPE_SECONDS]
+	escape_rule_label.text = "Escape: farther than %d from EVERY enemy for %s s." % [clear, Definitions.ESCAPE_SECONDS]
 	var seconds := ticks * Definitions.ESCAPE_SECONDS / NavalSimulation.escape_ticks_required(1.0 / 60.0)
 	if ticks > 0:
 		escape_status_label.text = "Breaking pursuit: %.1f / %.1f s — %s" % [
@@ -270,9 +261,13 @@ func _refresh_escape(sim, ship: Dictionary) -> void:
 		escape_bar.visible = true
 		escape_bar.value = clampf(seconds / Definitions.ESCAPE_SECONDS, 0.0, 1.0) * 100.0
 	elif _escape_reset_notice:
-		escape_status_label.text = "Pursuit resumed — progress reset; escape remains armed. (%s)" % distance_text
+		escape_status_label.text = "Pursuit resumed — progress reset. (%s)" % distance_text
 	else:
 		escape_status_label.text = "Get clear of every enemy — %s" % distance_text
+
+
+func _ship_state(ship: Dictionary) -> String:
+	return "Active" if ship["active"] else ("SUNK" if "sunk" in ship["defeat_reasons"] else "DISABLED · " + " · ".join(ship["defeat_reasons"]).to_upper())
 
 
 func _set_stats(rows: Dictionary, ship: Dictionary, vessel: Dictionary) -> void:
@@ -315,7 +310,9 @@ func _stat_row(parent: Node, stat: String, compact := false) -> Array:
 		title.add_theme_font_size_override("font_size", 16)
 	else:
 		_icon(row, stat)
-	var bar := _bar(row, Vector2(40 if compact else 96, 12))
+		_label(row).text = stat.capitalize()
+	var bar := _bar(row, Vector2(40 if compact else 60, 12))
+	bar.size_flags_horizontal = SIZE_EXPAND_FILL
 	var label := _label(row)
 	label.custom_minimum_size.x = 48 if compact else 80
 	if compact:

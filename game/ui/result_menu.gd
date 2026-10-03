@@ -29,9 +29,12 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	title_label = Label.new()
+	title_label.theme_type_variation = "NauticalHeading"
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title_label)
 	detail_label = Label.new()
+	detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail_label.custom_minimum_size.x = 680
 	box.add_child(detail_label)
 	replay_button = _button("Replay")
 	return_button = _button("Return to selection")

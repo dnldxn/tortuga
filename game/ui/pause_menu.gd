@@ -35,6 +35,7 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 12)
 	var title := Label.new()
+	title.theme_type_variation = "NauticalHeading"
 	title.text = "Paused"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
@@ -81,6 +82,8 @@ func show_help(sim) -> void:
 func _help_label(parent: Node) -> Label:
 	var label := Label.new()
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size.x = 900
 	parent.add_child(label)
 	return label
 

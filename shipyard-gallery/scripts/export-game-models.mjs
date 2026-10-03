@@ -106,6 +106,9 @@ function batchModel(modelRoot, sailPivots, sailSurfaces) {
   }
 
   const keep = new Set([modelRoot, ...sailPivots, ...sailSurfaces]);
+  modelRoot.traverse((object) => {
+    if (object.name.startsWith("Muzzle_")) keep.add(object);
+  });
   const prune = (object) => {
     [...object.children].forEach(prune);
     if (object !== modelRoot && object.isGroup && object.children.length === 0 && !keep.has(object)) {
@@ -137,6 +140,24 @@ for (const [vesselClass, variantIndex] of Object.entries(representatives)) {
       sailIndex += 1;
     }
   });
+  // Fail before exporting if a barrel tip lacks its stable gameplay mapping.
+  const expectedGuns = { sloop: 4, brig: 6, frigate: 8 }[vesselClass];
+  const barrels = [];
+  model.object.traverse((child) => { if (child.name === "cannon barrel") barrels.push(child); });
+  if (barrels.length !== expectedGuns * 2) throw new Error(`${vesselClass}: incorrect barrel count`);
+  for (const side of ["port", "starboard"]) {
+    let previousX = Infinity;
+    for (let index = 0; index < expectedGuns; index += 1) {
+      const marker = model.object.getObjectByName(`Muzzle_${side}_${index}`);
+      if (!marker || marker.position.x >= previousX) throw new Error(`${vesselClass}: missing or unordered muzzle`);
+      const sign = side === "starboard" ? 1 : -1;
+      const barrel = barrels.find((item) => item.position.x === marker.position.x && Math.sign(item.position.z) === sign);
+      const tip = barrel.position.clone();
+      tip.z += sign * barrel.geometry.parameters.height / 2;
+      if (tip.distanceTo(marker.position) > 1e-6) throw new Error(`${vesselClass}: muzzle misses barrel tip`);
+      previousX = marker.position.x;
+    }
+  }
   const renderableCount = batchModel(model.object, model.sailPivots, sailSurfaces);
   model.object.userData.fitHeight = model.fitHeight;
   model.object.userData.sailPivotCount = model.sailPivots.length;

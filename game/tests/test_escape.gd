@@ -358,7 +358,7 @@ func _test_ui(t) -> void:
 	sim.ships[2]["position"] = Vector2(3500, 2100)
 	sim.escape_armed = true
 	main.hud.refresh(sim)
-	t.check("farther than 1400 from EVERY active enemy for %s s" % Definitions.ESCAPE_SECONDS in hud.escape_rule_label.text,
+	t.check("farther than 1400 from EVERY enemy for %s s" % Definitions.ESCAPE_SECONDS in hud.escape_rule_label.text,
 		"armed HUD rule (%s)" % hud.escape_rule_label.text)
 	for i in 192:
 		main.advance_tick()
@@ -366,7 +366,7 @@ func _test_ui(t) -> void:
 		"counting HUD shows progress, target and nearest distance (%s)" % hud.escape_status_label.text)
 	sim.ships[2]["position"] = sim.ships[1]["position"] + Vector2(500, 0)
 	main.advance_tick()
-	t.check(hud.escape_status_label.text.begins_with("Pursuit resumed — progress reset; escape remains armed."),
+	t.check(hud.escape_status_label.text.begins_with("Pursuit resumed — progress reset."),
 		"reset HUD notice after interruption")
 	sim.ships[2]["position"] = sim.ships[1]["position"] + Vector2(2000, 0)
 	sim.escape_clear_ticks = required - 1

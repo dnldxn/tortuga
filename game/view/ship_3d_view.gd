@@ -38,6 +38,7 @@ var motion_pivot: Node3D
 var model_instance: Node3D
 var sail_pivots: Array[Node3D] = []
 var sail_surfaces: Array[MeshInstance3D] = []
+var muzzle_markers := {"port": [], "starboard": []}
 var motion_phase := 0.0
 var sail_trim := 0.0
 var speed_ratio := 0.0
@@ -147,6 +148,12 @@ func _build_model() -> void:
 
 
 func _collect_rig_nodes(node: Node) -> void:
+	if node is Node3D and node.name.begins_with("Muzzle_"):
+		var parts := String(node.name).split("_")
+		var markers: Array = muzzle_markers[parts[1]]
+		var index := int(parts[2])
+		markers.resize(maxi(markers.size(), index + 1))
+		markers[index] = node
 	if node is Node3D and node.name.begins_with("SailPivot_"):
 		sail_pivots.append(node)
 	if node is MeshInstance3D and node.name.begins_with("SailSurface_"):
@@ -236,3 +243,14 @@ func _sail_trim(relative_wind: float) -> float:
 func visual_yaw_for_heading(heading: float) -> float:
 	var depth_projection := CAMERA_RISE / sqrt(CAMERA_DISTANCE * CAMERA_DISTANCE + CAMERA_RISE * CAMERA_RISE)
 	return atan2(sin(heading) / depth_projection, cos(heading))
+
+
+## Zero-based gun index runs bow to stern, matching simulation shot events.
+## Project the actual exported tip, including heading and gentle motion, through
+## the same viewport/sprite transform as the visible barrel into arena coordinates.
+func muzzle_position(side: String, gun_index: int) -> Vector2:
+	if not muzzle_markers.has(side) or gun_index < 0 or gun_index >= muzzle_markers[side].size():
+		return global_position
+	var marker: Node3D = muzzle_markers[side][gun_index]
+	var pixel := model_camera.unproject_position(marker.global_position)
+	return display_sprite.to_global(pixel - Vector2(VIEWPORT_SIZE) * 0.5)

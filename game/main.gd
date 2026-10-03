@@ -49,6 +49,8 @@ var _reset_queued := false  # reset_practice pressed since the last tick
 
 
 func _ready() -> void:
+	get_window().min_size = Vector2i(1280, 720)
+	$UI.layer = 2
 	Bindings.install_defaults()
 	settings.load_settings()
 	settings.apply_values(settings.values)
@@ -64,6 +66,9 @@ func _ready() -> void:
 	for control in [hud, pause_menu, result_menu, selection, settings_menu]:
 		control.theme = theme
 		$UI.add_child(control)
+		_ornament_panels(control)
+	get_viewport().size_changed.connect(_fit_ui)
+	_fit_ui()
 	selection.start_requested.connect(start_encounter)
 	selection.quit_requested.connect(get_tree().quit)
 	pause_menu.resume_requested.connect(set_paused.bind(false))
@@ -117,6 +122,7 @@ func advance_tick() -> void:
 				commands[id] = ai_commands[id]
 	sim.step(DT, commands)
 	var presentation_events: Array = Presentation.normalize_events(sim.events)
+	combat_audio.arena_view = arena_view
 	combat_audio.consume(presentation_events)
 	arena_view.advance_effects()
 	hud.advance_effects()
@@ -237,13 +243,15 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
 		_clear_input()
 		settings_menu.release_all()
+		if mode == "result":
+			combat_audio.set_paused(true)
 		set_paused(true)  # focus-in deliberately never resumes
 
 
 func _enter_mode(new_mode: String) -> void:
 	mode = new_mode
 	if mode == "result":
-		combat_audio.clear()
+		combat_audio.finish_encounter()
 	_clear_input()
 	selection.visible = mode == "selection"
 	hud.visible = mode != "selection"
@@ -275,6 +283,10 @@ func _clear_input() -> void:
 func _make_theme() -> Theme:
 	var theme := Theme.new()
 	theme.default_font_size = 20
+	theme.set_type_variation("NauticalHeading", "Label")
+	theme.set_font("font", "NauticalHeading", preload("res://assets/fonts/DejaVuSerif-headings.ttf"))
+	theme.set_font_size("font_size", "NauticalHeading", 24)
+	theme.set_color("font_color", "NauticalHeading", Color(.98, .87, .59))
 	for type in ["Label", "Button"]:
 		theme.set_font_size("font_size", type, 20)
 	theme.set_color("font_color", "Label", Color.WHITE)
@@ -282,9 +294,17 @@ func _make_theme() -> Theme:
 	theme.set_constant("outline_size", "Label", 4)
 	var panel := StyleBoxFlat.new()
 	panel.bg_color = Color(0.04, 0.07, 0.12, 0.82)
-	panel.set_corner_radius_all(6)
+	panel.border_color = Color(.72, .57, .28, .9)
+	panel.set_border_width_all(1)
+	panel.set_corner_radius_all(3)
 	panel.set_content_margin_all(10)
 	theme.set_stylebox("panel", "PanelContainer", panel)
+	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var button := panel.duplicate()
+		button.bg_color = Color(.05, .13, .22, .94) if state in ["hover", "focus"] else Color(.03, .09, .16, .88)
+		button.border_color = Color(.95, .8, .43) if state == "focus" else panel.border_color
+		theme.set_stylebox(state, "Button", button)
+		theme.set_stylebox(state, "OptionButton", button)
 	var bar_bg := StyleBoxFlat.new()
 	bar_bg.bg_color = Color(0, 0, 0, 0.6)
 	bar_bg.set_corner_radius_all(2)
@@ -294,3 +314,24 @@ func _make_theme() -> Theme:
 	bar_fill.set_corner_radius_all(2)
 	theme.set_stylebox("fill", "ProgressBar", bar_fill)
 	return theme
+
+
+func _ornament_panels(node: Node) -> void:
+	if node is PanelContainer:
+		var panel: PanelContainer = node
+		panel.draw.connect(func():
+			var ink := Color(.78, .64, .35, .7)
+			for corner in [Vector2(5, 5), Vector2(panel.size.x - 5, 5), Vector2(5, panel.size.y - 5), panel.size - Vector2(5, 5)]:
+				var inward: Vector2 = (panel.size * .5 - corner).sign()
+				panel.draw_line(corner, corner + Vector2(inward.x * 7, 0), ink, 1)
+				panel.draw_line(corner, corner + Vector2(0, inward.y * 7), ink, 1))
+	for child in node.get_children():
+		_ornament_panels(child)
+
+
+## CanvasLayer has no Control parent to supply an anchor rectangle.
+func _fit_ui() -> void:
+	for control in [hud, pause_menu, result_menu, selection, settings_menu]:
+		control.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		control.position = Vector2.ZERO
+		control.size = get_viewport().get_visible_rect().size

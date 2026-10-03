@@ -6,7 +6,7 @@ Issue: https://github.com/dnldxn/tortuga/issues/8 · Godot 4.7.2 stable, Compati
 
 `two_sloops` places the selected player vessel at (2400, 2100), heading 0, and ordinary team-1 sloops at (3400, 1700) and (3400, 2500), heading π, with wind heading 0. They use the same movement, weapons, damage, contact, defeat and escape rules as the duel presets. The owner chose to retain the established sloop full speed **162** rather than the issue's proposed 180; no vessel or AI tuning constants changed. With owner approval, shared closest-approach avoidance now treats a nearby ship as a threat even at closest-approach time zero. The previous `t > 0` guard ignored equal-speed allies inside the existing clearance. Both AI ships receive independently keyed commands from the copied observation; the current aim lane suppresses an AI firing edge when an active ally intersects first, but actual later projectile contacts still apply friendly damage.
 
-The selection offers “Two-ship encounter — two sloops” with all three player vessels. The HUD and arena identify Sloop A (ID 2) and Sloop B (ID 3), retain defeated identities, show both conditions and results, and indicate assisted-target identities. Escape requires clearance from **every active enemy**. Existing replay, return, pause, and focus-loss controller paths apply.
+The selection offers “Two-ship encounter — two sloops” with all three player vessels. The HUD and arena identify Sloop A (ID 2) and Sloop B (ID 3), retain defeated identities, show both conditions and results, and show straight broadside lanes without target assistance. Escape requires clearance from **every active enemy**. Existing replay, return, pause, and focus-loss controller paths apply.
 
 ## Automated checks (Linux headless)
 
@@ -46,7 +46,7 @@ These tapes prove legal **simulation** escape reachability. They do not prove th
 
 ## Real-display handoff
 
-No display is available on this Linux host. Native screenshots and owner play observations have **not** been collected for this slice. On macOS, check 1280×720 and 1920×1080: select the fourth preset with mouse/keyboard and each vessel; read both status rows, shapes, edge markers and assisted targets; damage either enemy and continue after the first defeat; inspect both defeat reasons, replay and return to a duel with no B residue. Verify friendly blocking/hits, pause/focus/resume without buffered actions, and the escape countdown resetting when either live pursuer returns inside the clearance distance. Demonstrate a legal tactical escape with a live opponent for each vessel. Record actual build ID, resolution, machine, screenshots, and observations here when performed.
+No display is available on this Linux host. Native screenshots and owner play observations have **not** been collected for this slice. On macOS, check 1280×720 and 1920×1080: select the fourth preset with mouse/keyboard and each vessel; read both status rows, shapes, edge markers and broadside readiness; damage either enemy and continue after the first defeat; inspect both defeat reasons, replay and return to a duel with no B residue. Verify friendly blocking/hits, pause/focus/resume without buffered actions, and the escape countdown resetting when either live pursuer returns inside the clearance distance. Demonstrate a legal tactical escape with a live opponent for each vessel. Record actual build ID, resolution, machine, screenshots, and observations here when performed.
 
 | Build / resolution / tester | Observation |
 |---|---|

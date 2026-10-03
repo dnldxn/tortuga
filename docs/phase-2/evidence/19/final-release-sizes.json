@@ -1,0 +1,14 @@
+{
+  "Tortuga-0.999-linux.tar.gz": {
+    "download_bytes": 29289106,
+    "installed_bytes": 74409514
+  },
+  "Tortuga-0.999-macos.zip": {
+    "download_bytes": 61330218,
+    "installed_bytes": 171926086
+  },
+  "Tortuga-0.999-windows.zip": {
+    "download_bytes": 38939366,
+    "installed_bytes": 110158252
+  }
+}

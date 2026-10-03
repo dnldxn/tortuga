@@ -6,6 +6,7 @@ extends SceneTree
 ## Explicit suite registry: add one path per suite. Each script exposes `func run(t) -> bool`
 ## and returns true at the end, so a suite aborted by a runtime error counts as a failure.
 const SUITES: Array[String] = [
+	"res://tests/test_combat_effects.gd",
 	"res://tests/test_sailing.gd",
 	"res://tests/test_contact.gd",
 	"res://tests/test_controller.gd",
@@ -23,6 +24,8 @@ const SUITES: Array[String] = [
 	"res://tests/test_settings.gd",
 	"res://tests/test_settings_ui.gd",
 	"res://tests/test_presentation.gd",
+	"res://tests/test_hud_layout.gd",
+	"res://tests/test_muzzle_mapping.gd",
 	"res://tests/test_updater.gd",  # keep last: loaded packs persist and switch res:// to pack DirAccess
 ]
 

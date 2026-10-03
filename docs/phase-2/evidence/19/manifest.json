@@ -1,0 +1,141 @@
+{
+  "conversion": "Pillow RGB JPEG quality=82 optimize=True; no resizing or retouching",
+  "images": [
+    {
+      "file": "before-sloop-full.jpg",
+      "source": "/private/tmp/tortuga-19/before/sloop-full.png",
+      "source_sha256": "a34a2893b3f6093fc679effe5bcb4f2e3cc8b900badf3ca0eeface1eee50a25f",
+      "width": 1280,
+      "height": 720,
+      "bytes": 140163,
+      "sha256": "28b13d701d438cf97e486e793d503fee2a9965a4ccd871de03f26163f5555cc7"
+    },
+    {
+      "file": "before-brig-full.jpg",
+      "source": "/private/tmp/tortuga-19/before/brig-full.png",
+      "source_sha256": "ef21014b3303e7f2a9888a492baae778703e62d62c5cc76c333a40822f5f0076",
+      "width": 1280,
+      "height": 720,
+      "bytes": 140078,
+      "sha256": "18881efa86527b45bea3e31a3067a2db6d1fc58418df544755661e15a04e1453"
+    },
+    {
+      "file": "before-frigate-full.jpg",
+      "source": "/private/tmp/tortuga-19/before/frigate-full.png",
+      "source_sha256": "59a39e6d6c06225036bd634cc3fcf12dfb6a6e85ecce313b56011491466a3888",
+      "width": 1280,
+      "height": 720,
+      "bytes": 140445,
+      "sha256": "731562ae557cc83dbf453be87b555b4e9cf609d9e92cd199944ff62299c87e15"
+    },
+    {
+      "file": "after-models-sloop-full.jpg",
+      "source": "/private/tmp/tortuga-19/after-models/sloop-full.png",
+      "source_sha256": "af9010248c6774857b48583a36cdc67a81c9941a260434b18c1ed747423b6572",
+      "width": 1280,
+      "height": 720,
+      "bytes": 168954,
+      "sha256": "337fbbe0f46ee3be60ac36f1b5fb8a4f43ac3bc384d9677272fc9148e35d347f"
+    },
+    {
+      "file": "after-models-brig-full.jpg",
+      "source": "/private/tmp/tortuga-19/after-models/brig-full.png",
+      "source_sha256": "f3f8debf146f6951714eb13baad898aab84b6b1cb90ceb410ae8d11daf9714fe",
+      "width": 1280,
+      "height": 720,
+      "bytes": 169533,
+      "sha256": "703bd70803533f35e1ec571a66aa44ed38579d67ab4e68eb0592706a4c5526d6"
+    },
+    {
+      "file": "after-models-frigate-full.jpg",
+      "source": "/private/tmp/tortuga-19/after-models/frigate-full.png",
+      "source_sha256": "db3bddf9af65f1639127fd6a2348c381a4a5909bfd81b9092e5ce70da2dd96ef",
+      "width": 1280,
+      "height": 720,
+      "bytes": 170508,
+      "sha256": "30d000e9bdd1b6c3b2cfb6cb4eb16d9614fecce79946a8387d0661edf0b311d2"
+    },
+    {
+      "file": "after-hud-pause.jpg",
+      "source": "/private/tmp/tortuga-19/after-hud/pause.png",
+      "source_sha256": "547ca0aa156c55f83ba8ae56d2ca0740ec105a03f8fed8914bb74e7ad6695666",
+      "width": 1280,
+      "height": 720,
+      "bytes": 148939,
+      "sha256": "769a70f3e34d9b22cddd4d813cca7b38d7247ee055d9f54d773bb5524478817c"
+    },
+    {
+      "file": "after-hud-selection-notices.jpg",
+      "source": "/private/tmp/tortuga-19/after-hud/selection-notices.png",
+      "source_sha256": "8f95326fc1615decb3420c1380611385db8cb0ec4d91a7d774424c25f46e5ece",
+      "width": 1280,
+      "height": 720,
+      "bytes": 151949,
+      "sha256": "b8a0f0976d7d16781d50e070c7f2ea926bf5a208705e6a7c7490a1a5171eb1e6"
+    },
+    {
+      "file": "after-hud-settings.jpg",
+      "source": "/private/tmp/tortuga-19/after-hud/settings.png",
+      "source_sha256": "6064966a5311fe93196b43c89568966cf0454e27199240852efd10749e5f9fdc",
+      "width": 1280,
+      "height": 720,
+      "bytes": 98850,
+      "sha256": "c18e78c16f995d7d19b8ad83c0f8a3c1119f175b046e4670e13dcf122560bbcc"
+    },
+    {
+      "file": "after-hud-result.jpg",
+      "source": "/private/tmp/tortuga-19/after-hud/result.png",
+      "source_sha256": "3b486e397f2c7f6b6e5d405c878c62e8c0372963616af7d70ee47264e5fa9024",
+      "width": 1280,
+      "height": 720,
+      "bytes": 116114,
+      "sha256": "e94391bc48938611fee16d104047b35f29e870921b2425101ea9b6e4a6c53af5"
+    },
+    {
+      "file": "after-fx-round-muzzles.jpg",
+      "source": "/private/tmp/tortuga-19/after-fx/round-muzzles.png",
+      "source_sha256": "ce9d7341166b738f1b12a06bd024486480a23a5f5eeaf1f89ffe3deef8aa6c03",
+      "width": 1280,
+      "height": 720,
+      "bytes": 158374,
+      "sha256": "5e9aadfb18fb42b2f379a8de142db44dac39245c5dca6f8b105cd463bb8f2bbb"
+    },
+    {
+      "file": "after-fx-round-flight.jpg",
+      "source": "/private/tmp/tortuga-19/after-fx/round-flight.png",
+      "source_sha256": "a3dccb9555635f25b9539514970a90b22f027c93d5d2a8900bf559d98ce2c5ec",
+      "width": 1280,
+      "height": 720,
+      "bytes": 163130,
+      "sha256": "8d4d80671e069b5983b26a4bd85009ee8f4cd2634abb4052093404eddfa76572"
+    },
+    {
+      "file": "after-fx-chain-flight.jpg",
+      "source": "/private/tmp/tortuga-19/after-fx/chain-flight.png",
+      "source_sha256": "49441bbeb152ca1257a9cdee83b5b201498867c7ee10a83714f4490583eb60b1",
+      "width": 1280,
+      "height": 720,
+      "bytes": 165207,
+      "sha256": "6b42bf29c22b43c5cf8accaddfb979172a7818c7b17176e24d0bc9c27e21a903"
+    },
+    {
+      "file": "after-fx-grape-flight.jpg",
+      "source": "/private/tmp/tortuga-19/after-fx/grape-flight.png",
+      "source_sha256": "2b68602117a1d9d630b111285327a2d1434065ae887d8e70b0645636805f0a6c",
+      "width": 1280,
+      "height": 720,
+      "bytes": 164473,
+      "sha256": "03eaf7080216acd5cbcf94223eac7e431b20c247a93fe365d492c9ae85d3d0af"
+    },
+    {
+      "file": "after-fx-long-prompts.jpg",
+      "source": "/private/tmp/tortuga-19/after-fx/long-prompts.png",
+      "source_sha256": "4a8940c86d9e6ac532d447ef9aba107d4a2b16290be0bf214541197866851176",
+      "width": 1280,
+      "height": 720,
+      "bytes": 162316,
+      "sha256": "c4c4c2a251711358da28975b1bd1a59707cf63d049d76a7923e373f84cf0c70c"
+    }
+  ],
+  "total_image_bytes": 2259033
+}

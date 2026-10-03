@@ -1,0 +1,38 @@
+{
+  "font": "game/assets/fonts/DejaVuSerif-headings.ttf",
+  "before_bytes": 28096,
+  "after_bytes": 37740,
+  "before_sha256": "8e3573f97f89dd5c8db66ebb27c622d25c9e7658c84bed9aa4ec1f62998f11d3",
+  "after_sha256": "d1406920edd9ce434461aa0ed58251223832f39d2e7a382c860effde14863355",
+  "changed_tables": [
+    "head",
+    "name"
+  ],
+  "identical_tables": [
+    "glyf",
+    "maxp",
+    "loca",
+    "hmtx",
+    "hhea",
+    "OS/2",
+    "cmap",
+    "fpgm",
+    "prep",
+    "cvt ",
+    "post",
+    "gasp",
+    "GDEF",
+    "GPOS",
+    "GSUB",
+    "MATH"
+  ],
+  "license_name_id": 13,
+  "platform_id": 3,
+  "encoding_id": 1,
+  "language_id": "0x0409",
+  "license_characters": 4816,
+  "license_utf8_bytes": 4816,
+  "glyph_count": 123,
+  "cmap_character_count": 98,
+  "head_difference": "checkSumAdjustment only"
+}

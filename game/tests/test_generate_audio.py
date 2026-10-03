@@ -1,5 +1,7 @@
 """Deterministic source-asset and read-only verification contract."""
 
+import math
+import struct
 import subprocess
 import sys
 import tempfile
@@ -13,6 +15,21 @@ GENERATOR = GAME / "tools/generate_audio.py"
 
 
 class AudioAssets(unittest.TestCase):
+    def test_cannon_waveform_and_constructive_mix_bound(self):
+        with wave.open(str(GAME / "assets/audio/cannon.wav")) as wav:
+            rate = wav.getframerate()
+            pcm = wav.readframes(wav.getnframes())
+        values = [v / 32768 for v in struct.unpack("<%dh" % (len(pcm)//2), pcm)]
+        rms = lambda start, end: math.sqrt(sum(v*v for v in values[round(start*rate):round(end*rate)]) / round((end-start)*rate))
+        self.assertGreater(rms(.005, .05), 3 * rms(.40, .60))
+        self.assertLess(abs(sum(values)/len(values)), .001)
+        self.assertLess(abs(values[-1]), .001)
+        peak = max(map(abs, values))
+        # 64 worst-case perfectly constructive cannon tails + both impacts,
+        # splash, and sea; unit bus gains, mono summation, no limiter needed.
+        bound = 64 * peak * 10**(-40/20) + 3 * .8 * 10**(-18/20) + .25 * 10**(-20/20)
+        self.assertLess(bound, .85)
+
     def test_generator_reproducible_and_check_rejects_corruption(self):
         with tempfile.TemporaryDirectory() as folder:
             output = Path(folder)
