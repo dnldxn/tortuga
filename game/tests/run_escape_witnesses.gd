@@ -32,11 +32,12 @@ func _initialize() -> void:
 	quit(1 if failures > 0 else 0)
 
 
-## Every non-practice preset x every vessel (12 with the two-sloop encounter).
+## Every offline non-practice preset x every vessel (12 with the two-sloop encounter);
+## multiplayer-only group presets have no offline player and are skipped.
 func _matrix() -> Array:
 	var keys := []
 	for preset_id in Definitions.PRESETS:
-		if preset_id != "practice":
+		if preset_id != "practice" and not Definitions.PRESETS[preset_id].get("multiplayer_only", false):
 			for vessel_id in Definitions.VESSELS:
 				keys.append("%s/%s" % [preset_id, vessel_id])
 	return keys

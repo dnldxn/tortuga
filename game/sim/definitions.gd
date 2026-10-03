@@ -70,6 +70,7 @@ const PRESETS := {
 	## Fixed AI duels (plan 03): one team-1 opponent that sails, steers and fights
 	## like the player (role "ship", never practice_target).
 	"duel_sloop": {
+		"label": "Sloop duel",
 		"player_position": Vector2(2500, 2100),
 		"player_heading": 0.0,
 		"wind_heading": 0.0,
@@ -78,6 +79,7 @@ const PRESETS := {
 		],
 	},
 	"duel_brig": {
+		"label": "Brig duel",
 		"player_position": Vector2(3000, 1500),
 		"player_heading": PI / 2.0,
 		"wind_heading": 0.0,
@@ -86,6 +88,7 @@ const PRESETS := {
 		],
 	},
 	"duel_frigate": {
+		"label": "Frigate duel",
 		"player_position": Vector2(2500, 2100),
 		"player_heading": 0.0,
 		"wind_heading": PI / 4.0,
@@ -103,7 +106,40 @@ const PRESETS := {
 			{"id": 3, "team": 1, "vessel_id": "sloop", "position": Vector2(3400, 2500), "heading": PI, "role": "ship"},
 		],
 	},
+	## Group presets (Phase 3): multiplayer only, never in the offline menu. Beam wind, AI ships
+	## 600-1000 apart; player_position/heading is the first captain's spot, beyond ESCAPE_DISTANCE.
+	"brig_squadron": {
+		"label": "Brig squadron",
+		"multiplayer_only": true,
+		"player_position": Vector2(2200, 2100),
+		"player_heading": 0.0,
+		"wind_heading": PI / 2.0,
+		"opposition": [
+			{"id": 2, "team": 1, "vessel_id": "brig", "position": Vector2(3900, 1500), "heading": PI, "role": "ship"},
+			{"id": 3, "team": 1, "vessel_id": "brig", "position": Vector2(3900, 2100), "heading": PI, "role": "ship"},
+			{"id": 4, "team": 1, "vessel_id": "brig", "position": Vector2(3900, 2700), "heading": PI, "role": "ship"},
+		],
+	},
+	"frigate_escort": {
+		"label": "Frigate escort",
+		"multiplayer_only": true,
+		"player_position": Vector2(2200, 2100),
+		"player_heading": 0.0,
+		"wind_heading": -PI / 2.0,
+		"opposition": [
+			{"id": 2, "team": 1, "vessel_id": "frigate", "position": Vector2(4100, 2100), "heading": PI, "role": "ship"},
+			{"id": 3, "team": 1, "vessel_id": "sloop", "position": Vector2(3700, 1600), "heading": PI, "role": "ship"},
+			{"id": 4, "team": 1, "vessel_id": "sloop", "position": Vector2(3700, 2600), "heading": PI, "role": "ship"},
+		],
+	},
 }
+
+## Multiplayer battles (Phase 3): presets a battle may use (never "practice").
+const BATTLE_PRESETS: Array[String] = ["duel_sloop", "duel_brig", "duel_frigate", "two_sloops", "brig_squadron", "frigate_escort"]
+const MAX_CAPTAINS := 4  # per server; Plan 02 enforces both caps
+const MAX_BATTLES := 4  # concurrent battles per server
+const LINGER_SECONDS := 30.0  # battle-time grace for a left/dropped captain's ship
+const DROP_IN := {"margin": 200.0}  # spawn this far beyond the longest gun range (~2 s of a closing brig)
 
 
 ## Speed multiplier at 0/45/90/135/180 degrees off downwind; linear between knots.
@@ -159,6 +195,8 @@ const AI := {
 	"recovery_exit_separation": 100.0,
 	"recovery_inset": 150.0,
 	"avoid_bias": 0.5,
+	# Targeting: keep the current target unless another enemy is closer than ratio x its distance.
+	"retarget_ratio": 0.7,
 }
 
 

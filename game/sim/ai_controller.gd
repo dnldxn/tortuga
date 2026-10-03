@@ -1,9 +1,9 @@
 extends RefCounted
 ## Deterministic opposition AI. Maps a copied observation to ordinary commands;
 ## never touches the simulation, nodes, physics or input. Steering pursues a
-## broadside orbit of the living player; ammunition changes pass through the
-## same cycle commands a player would issue, with hysteresis to avoid
-## reload-cancel churn. All tuning lives in Definitions.AI.
+## broadside orbit of the nearest active enemy, sticky; ammunition changes
+## pass through the same cycle commands a player would issue, with hysteresis
+## to avoid reload-cancel churn. All tuning lives in Definitions.AI.
 
 const Definitions := preload("res://sim/definitions.gd")
 const NavalSimulation := preload("res://sim/naval_simulation.gd")
@@ -48,7 +48,7 @@ func commands_for_tick(observation: Dictionary, dt: float) -> Dictionary:
 		if not ship.get("active", false) or ship.get("team") != NavalSimulation.TEAM_OPPOSITION:
 			_memory.erase(id)
 			continue
-		var target := _target_for(observation, ship)
+		var target := _target_for(observation, ship, _memory[id].target_id if _memory.has(id) else -1)
 		if target.is_empty():
 			_memory.erase(id)  # no target or inactive opposition: no command
 			continue
@@ -82,15 +82,31 @@ func _track_progress(memory: ShipMemory, ship: Dictionary) -> void:
 		memory.last_progress = _clock
 
 
-## The single active enemy of this ship's team (this slice: the living player).
-func _target_for(observation: Dictionary, ship: Dictionary) -> Dictionary:
-	var best: Dictionary = {}
-	for other_id in observation["ships"]:
+## The nearest active enemy, sticky: ties go to the lowest id. A current target that is still an
+## active enemy is kept unless the nearest enemy is closer than AI.retarget_ratio x its distance.
+## Returns {} when no enemy is active.
+func _target_for(observation: Dictionary, ship: Dictionary, current_id := -1) -> Dictionary:
+	var ids: Array = observation["ships"].keys()
+	ids.sort()
+	var nearest: Dictionary = {}
+	var nearest_d2 := INF
+	for other_id in ids:
 		var other: Dictionary = observation["ships"][other_id]
-		if other["active"] and other["team"] != ship["team"]:
-			if best.is_empty() or other["id"] < best["id"]:
-				best = other
-	return best
+		if not other["active"] or other["team"] == ship["team"]:
+			continue
+		var d2: float = ship["position"].distance_squared_to(other["position"])
+		if d2 < nearest_d2:
+			nearest = other
+			nearest_d2 = d2
+	if nearest.is_empty() or not observation["ships"].has(current_id):
+		return nearest
+	var current: Dictionary = observation["ships"][current_id]
+	if not current["active"] or current["team"] == ship["team"]:
+		return nearest
+	var ratio: float = Definitions.AI["retarget_ratio"]
+	if nearest_d2 < ratio * ratio * ship["position"].distance_squared_to(current["position"]):
+		return nearest
+	return current
 
 
 ## Steering: avoidance/recovery first (boundary danger wins), then the broadside orbit.
