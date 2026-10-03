@@ -28,6 +28,7 @@ const SUITES: Array[String] = [
 	"res://tests/test_muzzle_mapping.gd",
 	"res://tests/test_battle_mode.gd",
 	"res://tests/test_ai_targeting.gd",
+	"res://tests/test_protocol.gd",
 	"res://tests/test_updater.gd",  # keep last: loaded packs persist and switch res:// to pack DirAccess
 ]
 
